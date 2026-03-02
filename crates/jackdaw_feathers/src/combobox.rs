@@ -234,7 +234,11 @@ fn setup_combobox(
             }
         };
 
-        commands.entity(entity).add_child(trigger_entity);
+        if let Ok(mut ec) = commands.get_entity(entity) {
+            ec.add_child(trigger_entity);
+        } else {
+            commands.entity(trigger_entity).despawn();
+        }
     }
 }
 

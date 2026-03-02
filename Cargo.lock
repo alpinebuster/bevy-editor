@@ -1267,9 +1267,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ef8e4b7e61dfe7719bb03c884dc270cd46a82efb40f93e9933b990c5c190c59"
 
 [[package]]
-name = "bevy_notify"
-version = "0.2.0"
-source = "git+https://github.com/Freyja-moth/bevy_notify#889e30b894b5bc4d45f1d919a95c542f2316c6d5"
+name = "bevy_monitors"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6efec01e1469c858de73cc213fab03d3b62623c373f360731f69708a2fbb43e0"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -1526,7 +1527,8 @@ dependencies = [
 [[package]]
 name = "bevy_rerecast"
 version = "0.4.0"
-source = "git+https://github.com/janhohenheim/rerecast#88f362cf8cbc7db8c151f496eb37c80d41c22db6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b56bf885d077e04dbfe050892a29feb3a20c602e59c80ae84ebe16742dd572e"
 dependencies = [
  "bevy_app",
  "bevy_rerecast_core",
@@ -1535,8 +1537,9 @@ dependencies = [
 
 [[package]]
 name = "bevy_rerecast_core"
-version = "0.4.0"
-source = "git+https://github.com/janhohenheim/rerecast#88f362cf8cbc7db8c151f496eb37c80d41c22db6"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e57e038905f01f46c55774deb06809d7f570a28a4c5e41dee14b50e817f0ad4"
 dependencies = [
  "anyhow",
  "bevy_app",
@@ -1566,7 +1569,8 @@ dependencies = [
 [[package]]
 name = "bevy_rerecast_editor_integration"
 version = "0.4.0"
-source = "git+https://github.com/janhohenheim/rerecast#88f362cf8cbc7db8c151f496eb37c80d41c22db6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "159a74df828813210ac43df3a3055cfe1a42264753af3fe9bebbcce5916fa225"
 dependencies = [
  "anyhow",
  "base64",
@@ -3723,7 +3727,7 @@ dependencies = [
  "base64",
  "bevy",
  "bevy_infinite_grid",
- "bevy_notify",
+ "bevy_monitors",
  "bevy_rerecast",
  "bincode",
  "ehttp",
@@ -3759,7 +3763,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_easings",
- "bevy_notify",
+ "bevy_monitors",
  "bevy_ui_text_input",
  "jackdaw_widgets",
  "lucide-icons",
@@ -3797,7 +3801,7 @@ name = "jackdaw_widgets"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_notify",
+ "bevy_monitors",
 ]
 
 [[package]]
@@ -5212,8 +5216,9 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "rerecast"
-version = "0.3.0"
-source = "git+https://github.com/janhohenheim/rerecast#88f362cf8cbc7db8c151f496eb37c80d41c22db6"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd207dd0644bd506d8017195865d72274dae648923596438255a0da00836f548"
 dependencies = [
  "anyhow",
  "bevy_reflect",

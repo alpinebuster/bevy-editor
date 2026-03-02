@@ -2,7 +2,7 @@ use std::any::TypeId;
 use std::collections::HashSet;
 
 use bevy::{input_focus::InputFocus, prelude::*, ui::ui_transform::UiGlobalTransform};
-use bevy_notify::prelude::{Mutation, NotifyChanged};
+use bevy_monitors::prelude::{Mutation, NotifyChanged};
 use jackdaw_feathers::{
     context_menu::spawn_context_menu,
     icons::IconFont,

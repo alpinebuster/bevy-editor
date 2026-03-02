@@ -2,6 +2,9 @@
 name = "jackdaw_terrain"
 version = "0.1.0"
 edition = "2024"
+description = "Internal crate for the jackdaw editor"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/jbuehler23/jackdaw"
 
 [dependencies]
 noise.workspace = true

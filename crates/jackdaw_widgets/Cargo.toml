@@ -2,10 +2,13 @@
 name = "jackdaw_widgets"
 version = "0.1.0"
 edition = "2024"
+description = "Internal crate for the jackdaw editor"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/jbuehler23/jackdaw"
 
 [dependencies]
 bevy.workspace = true
-bevy_notify.workspace = true
+bevy_monitors.workspace = true
 
 [lints]
 workspace = true

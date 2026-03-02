@@ -5,7 +5,7 @@ use jackdaw_feathers::{
     numeric_input,
     tokens,
 };
-use jackdaw_widgets::numeric_input::NumericValueChanged;
+use jackdaw_widgets::numeric_input::{NumericInput, NumericValueChanged};
 
 use super::{
     TerrainBrushSettings, TerrainDirtyChunks, TerrainEditMode,
@@ -16,7 +16,7 @@ use crate::selection::Selection;
 
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<TerrainGenerateState>()
-        .add_systems(Update, update_terrain_inspector)
+        .add_systems(Update, (update_terrain_inspector, sync_brush_fields))
         .add_observer(on_generate_clicked)
         .add_observer(on_erode_clicked);
 }
@@ -114,9 +114,7 @@ fn update_terrain_inspector(
 
     let changed = local_state.terrain_entity != terrain_entity
         || local_state.edit_mode_is_sculpt != is_sculpt
-        || (terrain_entity.is_some()
-            && (edit_mode.is_changed()
-                || brush_settings.is_changed()));
+        || (terrain_entity.is_some() && edit_mode.is_changed());
 
     if !changed {
         return;
@@ -372,6 +370,26 @@ fn update_terrain_inspector(
             commands.trigger(ErodeClicked);
         }),
     ));
+}
+
+/// Sync brush resource values into existing NumericInput widgets without rebuilding the UI.
+fn sync_brush_fields(
+    brush_settings: Res<TerrainBrushSettings>,
+    mut inputs: Query<(&BrushField, &mut NumericInput)>,
+) {
+    if !brush_settings.is_changed() {
+        return;
+    }
+    for (field, mut input) in &mut inputs {
+        let new_val = match field {
+            BrushField::Radius => brush_settings.radius as f64,
+            BrushField::Strength => brush_settings.strength as f64,
+            BrushField::Falloff => brush_settings.falloff as f64,
+        };
+        if input.value != new_val {
+            input.value = new_val;
+        }
+    }
 }
 
 // --- Spawn helpers ---

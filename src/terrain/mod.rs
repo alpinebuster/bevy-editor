@@ -16,12 +16,29 @@ impl Plugin for TerrainPlugin {
         app.init_resource::<TerrainEditMode>()
             .init_resource::<TerrainBrushSettings>()
             .init_resource::<TerrainSculptState>()
+            .add_systems(Update, ensure_terrain_dirty_chunks)
             .add_plugins((
                 mesh::plugin,
                 sculpt::plugin,
                 toolbar::plugin,
                 inspector::plugin,
             ));
+    }
+}
+
+/// Ensures every `Terrain` entity has a `TerrainDirtyChunks` component.
+/// This handles entities spawned via JSN scene load, where only reflected
+/// components are deserialized and runtime-only types like `TerrainDirtyChunks`
+/// are missing.
+fn ensure_terrain_dirty_chunks(
+    mut commands: Commands,
+    terrains: Query<Entity, (With<jackdaw_jsn::Terrain>, Without<TerrainDirtyChunks>)>,
+) {
+    for entity in &terrains {
+        commands.entity(entity).insert(TerrainDirtyChunks {
+            rebuild_all: true,
+            ..default()
+        });
     }
 }
 

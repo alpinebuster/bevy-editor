@@ -2,6 +2,12 @@
 name = "jackdaw"
 version = "0.1.0"
 edition = "2024"
+description = "A 3D level editor built with Bevy"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/jbuehler23/jackdaw"
+readme = "README.md"
+keywords = ["bevy", "editor", "3d", "level-editor"]
+categories = ["game-development", "graphics"]
 
 [workspace]
 members = ["crates/*"]
@@ -10,7 +16,7 @@ members = ["crates/*"]
 bevy.workspace = true
 jackdaw_jsn.workspace = true
 jackdaw_geometry.workspace = true
-bevy_notify.workspace = true
+bevy_monitors.workspace = true
 bevy_infinite_grid.workspace = true
 jackdaw_camera.workspace = true
 jackdaw_feathers.workspace = true
@@ -29,15 +35,15 @@ anyhow.workspace = true
 
 [workspace.dependencies]
 bevy = { version = "0.18", features = ["experimental_bevy_feathers", "serialize", "debug", "bevy_remote"] }
-jackdaw_jsn = { path = "crates/jackdaw_jsn" }
-jackdaw_geometry = { path = "crates/jackdaw_geometry" }
-bevy_notify = { git = "https://github.com/Freyja-moth/bevy_notify" }
+jackdaw_jsn = { version = "0.1.0", path = "crates/jackdaw_jsn" }
+jackdaw_geometry = { version = "0.1.0", path = "crates/jackdaw_geometry" }
+bevy_monitors = "0.2"
 bevy_infinite_grid = "0.18"
-jackdaw_camera = { path = "crates/jackdaw_camera" }
-jackdaw_feathers = { path = "crates/jackdaw_feathers" }
-jackdaw_widgets = { path = "crates/jackdaw_widgets" }
-jackdaw_commands = { path = "crates/jackdaw_commands" }
-jackdaw_terrain = { path = "crates/jackdaw_terrain" }
+jackdaw_camera = { version = "0.1.0", path = "crates/jackdaw_camera" }
+jackdaw_feathers = { version = "0.1.0", path = "crates/jackdaw_feathers" }
+jackdaw_widgets = { version = "0.1.0", path = "crates/jackdaw_widgets" }
+jackdaw_commands = { version = "0.1.0", path = "crates/jackdaw_commands" }
+jackdaw_terrain = { version = "0.1.0", path = "crates/jackdaw_terrain" }
 noise = "0.9"
 rand = "0.9"
 serde = "1"
@@ -47,7 +53,7 @@ bevy_ui_text_input = "0.7"
 bevy_easings = "0.18.0"
 avian3d = { version = "0.5", default-features = false, features = ["3d", "parry-f32"] }
 rfd = "0.15"
-bevy_rerecast = { git = "https://github.com/janhohenheim/rerecast", default-features = true }
+bevy_rerecast = { version = "0.4", default-features = true }
 ehttp = { version = "0.5", default-features = false, features = ["native-async", "json"] }
 bincode = { version = "2", features = ["serde"], default-features = false }
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }

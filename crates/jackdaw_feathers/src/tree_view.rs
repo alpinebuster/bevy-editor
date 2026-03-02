@@ -1,5 +1,5 @@
 use bevy::{feathers::theme::ThemedText, prelude::*, ui_widgets::observe};
-use bevy_notify::prelude::{MonitorSelf, Mutation, NotifyChanged};
+use bevy_monitors::prelude::{MonitorSelf, Mutation, NotifyChanged};
 use jackdaw_widgets::tree_view::{
     EntityCategory, TreeChildrenPopulated, TreeFocused, TreeNode, TreeNodeExpandToggle,
     TreeNodeExpanded, TreeRowChildren, TreeRowClicked, TreeRowContent, TreeRowDot, TreeRowDropped,

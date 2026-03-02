@@ -5,7 +5,9 @@ pub mod toolbar;
 mod visualization;
 
 use bevy::prelude::*;
-use bevy_rerecast::{prelude::*, rerecast::TriMesh};
+use bevy_rerecast::{prelude::*, rerecast::TriMesh, TriMeshFromBevyMesh as _};
+
+use crate::EditorEntity;
 
 pub use toolbar::NavmeshToolbar;
 
@@ -18,7 +20,7 @@ impl Plugin for NavmeshPlugin {
                 .build()
                 .disable::<bevy_rerecast::debug::NavmeshDebugPlugin>(),
         );
-        app.set_navmesh_backend(editor_backend);
+        app.set_navmesh_backend(scene_mesh_backend);
         app.init_resource::<NavmeshObstacles>()
             .init_resource::<NavmeshHandleRes>()
             .init_resource::<NavmeshState>();
@@ -32,8 +34,27 @@ impl Plugin for NavmeshPlugin {
     }
 }
 
-fn editor_backend(_: In<NavmeshSettings>, obstacles: Res<NavmeshObstacles>) -> TriMesh {
-    obstacles.0.clone()
+fn scene_mesh_backend(
+    input: In<NavmeshSettings>,
+    meshes: Res<Assets<Mesh>>,
+    mesh_entities: Query<(Entity, &GlobalTransform, &Mesh3d), Without<EditorEntity>>,
+    brp_obstacles: Res<NavmeshObstacles>,
+) -> TriMesh {
+    let mut result = brp_obstacles.0.clone();
+    for (entity, global_tf, mesh_handle) in mesh_entities.iter() {
+        if input.filter.as_ref().is_some_and(|f| !f.contains(&entity)) {
+            continue;
+        }
+        let Some(mesh) = meshes.get(mesh_handle) else {
+            continue;
+        };
+        let transform = global_tf.compute_transform();
+        let transformed = mesh.clone().transformed_by(transform);
+        if let Some(tri) = TriMesh::from_mesh(&transformed) {
+            result.extend(tri);
+        }
+    }
+    result
 }
 
 #[derive(Resource, Deref, DerefMut, Default)]
