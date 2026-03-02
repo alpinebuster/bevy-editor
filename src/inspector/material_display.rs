@@ -1,12 +1,14 @@
 use bevy::prelude::*;
-use jackdaw_feathers::{numeric_input, tokens};
-use jackdaw_widgets::numeric_input::NumericValueChanged;
+use jackdaw_feathers::{
+    text_edit::{self, TextEditCommitEvent, TextEditProps},
+    tokens,
+};
 
 /// Marker for material field UI entities
 #[derive(Component)]
 struct MaterialFieldMarker;
 
-/// Spawn material fields in a deferred command to access Assets<StandardMaterial>.
+/// Spawn material fields in a deferred command to access `Assets<StandardMaterial>`.
 pub(super) fn spawn_material_display_deferred(
     commands: &mut Commands,
     body_entity: Entity,
@@ -109,16 +111,40 @@ fn spawn_material_fields(world: &mut World, body_entity: Entity, source_entity: 
     }
 
     // metallic (f32 numeric input)
-    spawn_material_numeric_field(world, body_entity, "metallic", metallic as f64, source_entity,
-        |mat, val| { mat.metallic = val as f32; });
+    spawn_material_numeric_field(
+        world,
+        body_entity,
+        "metallic",
+        metallic as f64,
+        source_entity,
+        |mat, val| {
+            mat.metallic = val as f32;
+        },
+    );
 
     // perceptual_roughness
-    spawn_material_numeric_field(world, body_entity, "roughness", perceptual_roughness as f64, source_entity,
-        |mat, val| { mat.perceptual_roughness = val as f32; });
+    spawn_material_numeric_field(
+        world,
+        body_entity,
+        "roughness",
+        perceptual_roughness as f64,
+        source_entity,
+        |mat, val| {
+            mat.perceptual_roughness = val as f32;
+        },
+    );
 
     // reflectance
-    spawn_material_numeric_field(world, body_entity, "reflectance", reflectance as f64, source_entity,
-        |mat, val| { mat.reflectance = val as f32; });
+    spawn_material_numeric_field(
+        world,
+        body_entity,
+        "reflectance",
+        reflectance as f64,
+        source_entity,
+        |mat, val| {
+            mat.reflectance = val as f32;
+        },
+    );
 
     // emissive (show as text for now - it's LinearRgba which is complex)
     {
@@ -147,6 +173,40 @@ fn spawn_material_fields(world: &mut World, body_entity: Entity, source_entity: 
         TextColor(tokens::TEXT_SECONDARY),
         ChildOf(body_entity),
     ));
+}
+
+/// Binding that links a material text_edit to a source entity and material field mutator.
+#[derive(Component)]
+pub(super) struct MaterialFieldBinding {
+    pub(super) source_entity: Entity,
+    pub(super) apply_fn: fn(&mut StandardMaterial, f64),
+}
+
+/// Handle TextEditCommitEvent for material field bindings.
+pub(super) fn on_material_text_commit(
+    event: On<TextEditCommitEvent>,
+    bindings: Query<&MaterialFieldBinding>,
+    child_of_query: Query<&ChildOf>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mat_query: Query<&MeshMaterial3d<StandardMaterial>>,
+) {
+    let mut current = event.entity;
+    for _ in 0..4 {
+        let Ok(child_of) = child_of_query.get(current) else {
+            break;
+        };
+        if let Ok(binding) = bindings.get(child_of.parent()) {
+            let value: f64 = event.text.parse().unwrap_or(0.0);
+            let Ok(mat_comp) = mat_query.get(binding.source_entity) else {
+                return;
+            };
+            if let Some(material) = materials.get_mut(&mat_comp.0) {
+                (binding.apply_fn)(material, value);
+            }
+            return;
+        }
+        current = child_of.parent();
+    }
 }
 
 fn spawn_material_numeric_field(
@@ -184,20 +244,17 @@ fn spawn_material_numeric_field(
         ChildOf(row),
     ));
 
-    let input = world
-        .spawn((numeric_input::numeric_input(value), ChildOf(row)))
-        .id();
-
-    world.entity_mut(input).observe(
-        move |changed: On<NumericValueChanged>,
-              mut materials: ResMut<Assets<StandardMaterial>>,
-              mat_query: Query<&MeshMaterial3d<StandardMaterial>>| {
-            let Ok(mat_comp) = mat_query.get(source_entity) else {
-                return;
-            };
-            if let Some(material) = materials.get_mut(&mat_comp.0) {
-                apply_fn(material, changed.value);
-            }
+    world.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .numeric_f32()
+                .grow()
+                .with_default_value(value.to_string()),
+        ),
+        MaterialFieldBinding {
+            source_entity,
+            apply_fn,
         },
-    );
+        ChildOf(row),
+    ));
 }

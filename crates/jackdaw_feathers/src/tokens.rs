@@ -17,7 +17,12 @@ pub const TOOLBAR_BG: Color = Color::Srgba(tailwind::ZINC_800);
 /// Text input background
 pub const INPUT_BG: Color = Color::Srgba(tailwind::ZINC_900);
 /// Context menu / dropdown background
-pub const MENU_BG: Color = Color::Srgba(Srgba { red: tailwind::ZINC_800.red, green: tailwind::ZINC_800.green, blue: tailwind::ZINC_800.blue, alpha: 0.98 });
+pub const MENU_BG: Color = Color::Srgba(Srgba {
+    red: tailwind::ZINC_800.red,
+    green: tailwind::ZINC_800.green,
+    blue: tailwind::ZINC_800.blue,
+    alpha: 0.98,
+});
 /// Status bar background
 pub const STATUS_BAR_BG: Color = Color::Srgba(tailwind::ZINC_800);
 /// Inactive toolbar button background
@@ -41,11 +46,26 @@ pub const SELECTED_BORDER: Color = Color::srgba(0.035, 0.290, 0.580, 1.0);
 /// Active / pressed background
 pub const ACTIVE_BG: Color = Color::Srgba(tailwind::ZINC_600);
 /// Drag-drop target highlight
-pub const DROP_TARGET_BG: Color = Color::Srgba(Srgba { red: 0.3, green: 0.5, blue: 0.2, alpha: 1.0 });
+pub const DROP_TARGET_BG: Color = Color::Srgba(Srgba {
+    red: 0.3,
+    green: 0.5,
+    blue: 0.2,
+    alpha: 1.0,
+});
 /// Drag-drop target border accent
-pub const DROP_TARGET_BORDER: Color = Color::Srgba(Srgba { red: 0.3, green: 0.7, blue: 0.4, alpha: 1.0 });
+pub const DROP_TARGET_BORDER: Color = Color::Srgba(Srgba {
+    red: 0.3,
+    green: 0.7,
+    blue: 0.4,
+    alpha: 1.0,
+});
 /// Root container drag-drop overlay
-pub const CONTAINER_DROP_TARGET_BG: Color = Color::Srgba(Srgba { red: 0.2, green: 0.3, blue: 0.2, alpha: 0.3 });
+pub const CONTAINER_DROP_TARGET_BG: Color = Color::Srgba(Srgba {
+    red: 0.2,
+    green: 0.3,
+    blue: 0.2,
+    alpha: 0.3,
+});
 /// Tree connection line color
 pub const CONNECTION_LINE: Color = Color::srgba(1.0, 1.0, 1.0, 0.2);
 

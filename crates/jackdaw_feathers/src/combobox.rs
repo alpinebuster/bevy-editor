@@ -2,10 +2,10 @@ use bevy::prelude::*;
 use lucide_icons::Icon;
 
 use crate::button::{
-    button, icon_button, set_button_variant, ButtonClickEvent, ButtonProps, ButtonSize,
-    ButtonVariant, IconButtonProps,
+    ButtonClickEvent, ButtonProps, ButtonSize, ButtonVariant, IconButtonProps, button, icon_button,
+    set_button_variant,
 };
-use crate::popover::{popover, EditorPopover, PopoverPlacement, PopoverProps};
+use crate::popover::{EditorPopover, PopoverPlacement, PopoverProps, popover};
 use crate::utils::is_descendant_of;
 
 pub fn plugin(app: &mut App) {

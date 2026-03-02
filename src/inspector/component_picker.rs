@@ -11,12 +11,11 @@ use bevy::{
         reflect::{AppTypeRegistry, ReflectComponent},
     },
     feathers::theme::ThemedText,
-    input_focus::InputFocus,
     prelude::*,
     ui_widgets::observe,
 };
+use jackdaw_feathers::text_edit::{self, TextEditProps, TextEditValue};
 use jackdaw_feathers::tokens;
-use jackdaw_widgets::text_input::TextInput;
 
 use super::{
     AddComponentButton, ComponentPicker, ComponentPickerEntry, ComponentPickerSearch, Inspector,
@@ -33,7 +32,6 @@ pub(crate) fn on_add_component_button_click(
     components: &Components,
     entity_query: Query<&Archetype, (With<Selected>, Without<EditorEntity>)>,
     inspector: Single<Entity, With<Inspector>>,
-    mut input_focus: ResMut<InputFocus>,
 ) {
     // Check if this click is on an AddComponentButton
     if add_buttons.get(event.entity).is_err() {
@@ -91,10 +89,7 @@ pub(crate) fn on_add_component_button_click(
         };
 
         let short_name = table.short_path().to_string();
-        let module = table
-            .module_path()
-            .unwrap_or("")
-            .to_string();
+        let module = table.module_path().unwrap_or("").to_string();
 
         available.push((short_name, module, type_id, component_id));
     }
@@ -120,14 +115,15 @@ pub(crate) fn on_add_component_button_click(
         .id();
 
     // Search input
-    let search_entity = commands
-        .spawn((
-            ComponentPickerSearch,
-            jackdaw_feathers::text_input::text_input("Search components..."),
-            ChildOf(picker),
-        ))
-        .id();
-    input_focus.set(search_entity);
+    commands.spawn((
+        ComponentPickerSearch,
+        text_edit::text_edit(
+            TextEditProps::default()
+                .with_placeholder("Search components...")
+                .allow_empty(),
+        ),
+        ChildOf(picker),
+    ));
 
     // Scrollable list
     let list = commands
@@ -152,39 +148,33 @@ pub(crate) fn on_add_component_button_click(
                     short_name: short_name.clone(),
                 },
                 Node {
-                    padding: UiRect::axes(
-                        Val::Px(tokens::SPACING_LG),
-                        Val::Px(tokens::SPACING_SM),
-                    ),
+                    padding: UiRect::axes(Val::Px(tokens::SPACING_LG), Val::Px(tokens::SPACING_SM)),
                     width: Val::Percent(100.0),
                     ..Default::default()
                 },
                 BackgroundColor(Color::NONE),
                 ChildOf(list),
-                observe(
-                    move |_: On<Pointer<Click>>, mut commands: Commands| {
-                        // Insert the component and close the picker
-                        commands.queue(move |world: &mut World| {
-                            let cmd = crate::commands::AddComponent {
-                                entity: source_entity,
-                                type_id,
-                                component_id,
-                            };
-                            let cmd = Box::new(cmd);
-                            cmd.execute(world);
-                            let mut history =
-                                world.resource_mut::<crate::commands::CommandHistory>();
-                            history.undo_stack.push(cmd);
-                            history.redo_stack.clear();
+                observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
+                    // Insert the component and close the picker
+                    commands.queue(move |world: &mut World| {
+                        let cmd = crate::commands::AddComponent {
+                            entity: source_entity,
+                            type_id,
+                            component_id,
+                        };
+                        let cmd = Box::new(cmd);
+                        cmd.execute(world);
+                        let mut history = world.resource_mut::<crate::commands::CommandHistory>();
+                        history.undo_stack.push(cmd);
+                        history.redo_stack.clear();
 
-                            // Force refresh: toggle Selected to rebuild inspector
-                            if let Ok(mut entity) = world.get_entity_mut(source_entity) {
-                                entity.remove::<Selected>();
-                            }
-                            world.entity_mut(source_entity).insert(Selected);
-                        });
-                    },
-                ),
+                        // Force refresh: toggle Selected to rebuild inspector
+                        if let Ok(mut entity) = world.get_entity_mut(source_entity) {
+                            entity.remove::<Selected>();
+                        }
+                        world.entity_mut(source_entity).insert(Selected);
+                    });
+                }),
                 observe(
                     move |hover: On<Pointer<Over>>, mut bg: Query<&mut BackgroundColor>| {
                         if let Ok(mut bg) = bg.get_mut(hover.event_target()) {
@@ -213,19 +203,18 @@ pub(crate) fn on_add_component_button_click(
 
 /// Filter the component picker list based on search input.
 pub(crate) fn filter_component_picker(
-    search_query: Query<&TextInput, (With<ComponentPickerSearch>, Changed<TextInput>)>,
+    search_query: Query<&TextEditValue, (With<ComponentPickerSearch>, Changed<TextEditValue>)>,
     entries: Query<(Entity, &ComponentPickerEntry)>,
     mut node_query: Query<&mut Node>,
 ) {
     let Ok(search) = search_query.single() else {
         return;
     };
-    let filter = search.value.trim().to_lowercase();
+    let filter = search.0.trim().to_lowercase();
 
     for (entity, entry) in &entries {
         if let Ok(mut node) = node_query.get_mut(entity) {
-            node.display = if filter.is_empty()
-                || entry.short_name.to_lowercase().contains(&filter)
+            node.display = if filter.is_empty() || entry.short_name.to_lowercase().contains(&filter)
             {
                 Display::Flex
             } else {

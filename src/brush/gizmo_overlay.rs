@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 
-use jackdaw_jsn::Brush;
-use super::{
-    BrushEditMode, BrushMeshCache, BrushSelection, EditMode,
+use super::interaction::{
+    BrushDragState, EdgeDragState, FaceExtrudeMode, VertexDragConstraint, VertexDragState,
 };
-use super::interaction::{BrushDragState, EdgeDragState, FaceExtrudeMode, VertexDragConstraint, VertexDragState};
+use super::{BrushEditMode, BrushMeshCache, BrushSelection, EditMode};
+use jackdaw_jsn::Brush;
 
 const EDIT_EDGE_COLOR: Color = Color::srgba(1.0, 0.8, 0.0, 1.0);
 const EDIT_VERTEX_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 1.0);
@@ -45,7 +45,10 @@ pub(super) fn draw_brush_edit_gizmos(
             let a = polygon[i];
             let b = polygon[(i + 1) % polygon.len()];
             let edge = (a.min(b), a.max(b));
-            if !drawn_edges.iter().any(|(ea, eb, _)| *ea == edge.0 && *eb == edge.1) {
+            if !drawn_edges
+                .iter()
+                .any(|(ea, eb, _)| *ea == edge.0 && *eb == edge.1)
+            {
                 let selected = brush_selection.edges.contains(&edge);
                 drawn_edges.push((edge.0, edge.1, selected));
             }
@@ -86,7 +89,8 @@ pub(super) fn draw_brush_edit_gizmos(
                 // Draw face outline in bright color
                 for i in 0..polygon.len() {
                     let a = brush_global.transform_point(cache.vertices[polygon[i]]);
-                    let b = brush_global.transform_point(cache.vertices[polygon[(i + 1) % polygon.len()]]);
+                    let b = brush_global
+                        .transform_point(cache.vertices[polygon[(i + 1) % polygon.len()]]);
                     gizmos.line(a, b, SELECTED_VERTEX_COLOR);
                 }
                 // Draw the face normal from centroid
@@ -96,7 +100,11 @@ pub(super) fn draw_brush_edit_gizmos(
                 let normal = brush.faces[face_idx].plane.normal;
                 let (_, brush_rot, _) = brush_global.to_scale_rotation_translation();
                 let world_normal = brush_rot * normal;
-                gizmos.arrow(world_centroid, world_centroid + world_normal * 0.5, Color::srgb(0.0, 1.0, 1.0));
+                gizmos.arrow(
+                    world_centroid,
+                    world_centroid + world_normal * 0.5,
+                    Color::srgb(0.0, 1.0, 1.0),
+                );
             }
         }
     }
@@ -148,7 +156,11 @@ pub(super) fn draw_brush_edit_gizmos(
             let (_, brush_rot, _) = brush_global.to_scale_rotation_translation();
             let world_axis = brush_rot * axis_dir;
             let center = brush_global.translation();
-            gizmos.line(center - world_axis * 50.0, center + world_axis * 50.0, color);
+            gizmos.line(
+                center - world_axis * 50.0,
+                center + world_axis * 50.0,
+                color,
+            );
         }
     }
 }

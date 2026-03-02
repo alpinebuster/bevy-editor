@@ -56,22 +56,20 @@ pub trait Displayable {
     fn display(&self, entity: &mut EntityCommands, source: Entity);
 }
 
+/// Marker for Name field text_edit inputs in the inspector.
+#[derive(Component)]
+struct NameFieldInput(Entity);
+
 impl Displayable for Name {
     fn display(&self, entity: &mut EntityCommands, source: Entity) {
         entity
-            .insert(jackdaw_feathers::text_input::text_input("Name..."))
-            .insert(jackdaw_widgets::text_input::TextInput::new(self.to_string()))
-            .observe(
-                move |text: On<jackdaw_widgets::text_input::EnteredText>,
-                      mut names: Query<&mut Name>|
-                      -> Result<(), BevyError> {
-                    let mut name = names.get_mut(source)?;
-
-                    *name = Name::new(text.value.clone());
-
-                    Ok(())
-                },
-            );
+            .insert(jackdaw_feathers::text_edit::text_edit(
+                jackdaw_feathers::text_edit::TextEditProps::default()
+                    .with_placeholder("Name...")
+                    .with_default_value(self.to_string())
+                    .allow_empty(),
+            ))
+            .insert(NameFieldInput(source));
     }
 }
 
@@ -88,10 +86,15 @@ impl Plugin for InspectorPlugin {
             .add_observer(component_display::add_component_displays)
             .add_observer(component_picker::on_add_component_button_click)
             .add_observer(reflect_fields::on_checkbox_commit)
+            .add_observer(reflect_fields::on_text_edit_commit)
             .add_observer(custom_props_display::on_custom_property_checkbox_commit)
+            .add_observer(custom_props_display::on_custom_property_text_commit)
             .add_observer(brush_display::handle_clear_texture)
             .add_observer(brush_display::handle_apply_texture_to_all)
             .add_observer(brush_display::handle_uv_scale_preset)
+            .add_observer(brush_display::on_brush_face_text_commit)
+            .add_observer(on_name_field_commit)
+            .add_observer(material_display::on_material_text_commit)
             .add_systems(
                 Update,
                 (
@@ -100,6 +103,36 @@ impl Plugin for InspectorPlugin {
                     brush_display::update_brush_face_properties,
                 ),
             );
+    }
+}
+
+/// Handle TextEditCommitEvent for Name field inputs.
+fn on_name_field_commit(
+    event: On<jackdaw_feathers::text_edit::TextEditCommitEvent>,
+    name_inputs: Query<&NameFieldInput>,
+    child_of_query: Query<&ChildOf>,
+    mut names: Query<&mut Name>,
+) {
+    // Walk up from the committed entity to find a NameFieldInput
+    let mut current = event.entity;
+    let mut source = None;
+    for _ in 0..4 {
+        let Ok(child_of) = child_of_query.get(current) else {
+            break;
+        };
+        if let Ok(name_input) = name_inputs.get(child_of.parent()) {
+            source = Some(name_input.0);
+            break;
+        }
+        current = child_of.parent();
+    }
+
+    let Some(source_entity) = source else {
+        return;
+    };
+
+    if let Ok(mut name) = names.get_mut(source_entity) {
+        *name = Name::new(event.text.clone());
     }
 }
 

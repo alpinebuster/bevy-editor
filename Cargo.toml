@@ -63,6 +63,8 @@ anyhow = { version = "1", default-features = false }
 [workspace.lints.clippy]
 too_many_arguments = "allow"
 type_complexity = "allow"
+collapsible_if = "allow"
+redundant_closure = "allow"
 
 [lints]
 workspace = true

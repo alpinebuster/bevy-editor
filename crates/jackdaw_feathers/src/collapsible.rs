@@ -82,13 +82,13 @@ pub fn collapsible_section(
 
     // Toggle on click
     let section_entity = section;
-    commands.entity(header).observe(
-        move |_: On<Pointer<Click>>, mut commands: Commands| {
+    commands
+        .entity(header)
+        .observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
             commands.trigger(ToggleCollapsible {
                 entity: section_entity,
             });
-        },
-    );
+        });
 
     // Hover effect on header
     commands.entity(header).observe(

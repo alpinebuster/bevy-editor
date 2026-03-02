@@ -5,20 +5,20 @@ use bevy::{
     ui::UiGlobalTransform,
 };
 
-use jackdaw_jsn::{Brush, BrushFaceData, BrushPlane};
-use jackdaw_geometry::{
-    brush_planes_to_world, brushes_intersect, clean_degenerate_faces, compute_brush_geometry,
-    compute_face_tangent_axes, subtract_brush,
-};
 use crate::{
+    EditorEntity,
     brush::BrushFaceEntity,
     commands::{CommandHistory, EditorCommand, snapshot_entity, snapshot_rebuild},
     selection::{Selected, Selection},
     snapping::SnapSettings,
     viewport::SceneViewport,
     viewport_util::window_to_viewport_cursor,
-    EditorEntity,
 };
+use jackdaw_geometry::{
+    brush_planes_to_world, brushes_intersect, clean_degenerate_faces, compute_brush_geometry,
+    compute_face_tangent_axes, subtract_brush,
+};
+use jackdaw_jsn::{Brush, BrushFaceData, BrushPlane};
 
 const EXTRUDE_DEPTH_SENSITIVITY: f32 = 0.003;
 const MIN_FOOTPRINT_SIZE: f32 = 0.01;
@@ -103,19 +103,18 @@ pub struct DrawBrushPlugin;
 
 impl Plugin for DrawBrushPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<DrawBrushState>()
-            .add_systems(
-                Update,
-                (
-                    draw_brush_activate,
-                    draw_brush_update,
-                    draw_brush_release,
-                    draw_brush_confirm,
-                    draw_brush_cancel,
-                    draw_brush_preview,
-                )
-                    .chain(),
-            );
+        app.init_resource::<DrawBrushState>().add_systems(
+            Update,
+            (
+                draw_brush_activate,
+                draw_brush_update,
+                draw_brush_release,
+                draw_brush_confirm,
+                draw_brush_cancel,
+                draw_brush_preview,
+            )
+                .chain(),
+        );
     }
 }
 
@@ -155,9 +154,7 @@ fn draw_brush_activate(
 
     // Check if a brush is selected — if so and mode is Add, use append mode
     let append_target = if mode == DrawMode::Add {
-        selection
-            .primary()
-            .filter(|&e| brush_query.contains(e))
+        selection.primary().filter(|&e| brush_query.contains(e))
     } else {
         None
     };
@@ -231,16 +228,12 @@ fn draw_brush_update(
     match active.phase {
         DrawPhase::PlacingFirstCorner => {
             // Ctrl toggles plane lock
-            if ctrl {
-                active.plane_locked = true;
-            } else {
-                active.plane_locked = false;
-            }
+            active.plane_locked = ctrl;
 
             if !active.plane_locked {
                 // Raycast against brush face meshes
-                let settings = MeshRayCastSettings::default()
-                    .with_visibility(RayCastVisibility::Any);
+                let settings =
+                    MeshRayCastSettings::default().with_visibility(RayCastVisibility::Any);
                 let hits = ray_cast.cast_ray(ray, &settings);
 
                 let mut found_face = false;
@@ -367,7 +360,8 @@ fn draw_brush_release(
     let Ok((camera, _)) = camera_query.single() else {
         return;
     };
-    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query) else {
+    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
+    else {
         return;
     };
 
@@ -669,7 +663,8 @@ fn draw_brush_preview(
                     let cutter_planes = build_cutter_planes(active);
                     for (brush, brush_tf) in &brushes {
                         let (_, rotation, translation) = brush_tf.to_scale_rotation_translation();
-                        let world_target = brush_planes_to_world(&brush.faces, rotation, translation);
+                        let world_target =
+                            brush_planes_to_world(&brush.faces, rotation, translation);
                         let mut combined = world_target;
                         combined.extend_from_slice(&cutter_planes);
                         let (verts, polys) = compute_brush_geometry(&combined);
@@ -712,9 +707,8 @@ fn spawn_drawn_brush(active: &ActiveDraw, commands: &mut Commands) {
     let half_depth = active.depth.abs() / 2.0;
 
     // Center on the plane
-    let center_on_plane = plane.origin
-        + plane.axis_u * (min_u + max_u) / 2.0
-        + plane.axis_v * (min_v + max_v) / 2.0;
+    let center_on_plane =
+        plane.origin + plane.axis_u * (min_u + max_u) / 2.0 + plane.axis_v * (min_v + max_v) / 2.0;
     let center = center_on_plane + plane.normal * active.depth / 2.0;
 
     // For ground-plane (normal=Y): axis_u=X, axis_v=Z, normal=Y
@@ -734,7 +728,10 @@ fn spawn_drawn_brush(active: &ActiveDraw, commands: &mut Commands) {
 
     commands.queue(move |world: &mut World| {
         // Apply last-used texture to all faces
-        let last_tex = world.resource::<crate::brush::LastUsedTexture>().texture_path.clone();
+        let last_tex = world
+            .resource::<crate::brush::LastUsedTexture>()
+            .texture_path
+            .clone();
         let mut brush = brush;
         if let Some(ref path) = last_tex {
             for face in &mut brush.faces {
@@ -901,8 +898,7 @@ fn append_to_brush(active: &ActiveDraw, commands: &mut Commands) {
                         .iter()
                         .filter(|&&i| i < existing_count && old_set.contains(&i))
                         .count() as f32;
-                    let normal_sim =
-                        hull_face.normal.dot(old_brush.faces[old_idx].plane.normal);
+                    let normal_sim = hull_face.normal.dot(old_brush.faces[old_idx].plane.normal);
                     let score = overlap + normal_sim * 0.1;
                     if score > best_score {
                         best_score = score;
@@ -1069,14 +1065,17 @@ fn convex_hull_on_plane(points: &[Vec3], plane: &DrawPlane) -> Vec<Vec3> {
             )
     });
 
-    let cross =
-        |o: Vec2, a: Vec2, b: Vec2| (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    let cross = |o: Vec2, a: Vec2, b: Vec2| (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
     let mut hull: Vec<usize> = Vec::new();
     // Lower hull
     for &i in &indexed {
         while hull.len() >= 2
-            && cross(pts2d[hull[hull.len() - 2]], pts2d[hull[hull.len() - 1]], pts2d[i]) <= 0.0
+            && cross(
+                pts2d[hull[hull.len() - 2]],
+                pts2d[hull[hull.len() - 1]],
+                pts2d[i],
+            ) <= 0.0
         {
             hull.pop();
         }
@@ -1086,7 +1085,11 @@ fn convex_hull_on_plane(points: &[Vec3], plane: &DrawPlane) -> Vec<Vec3> {
     let lower_len = hull.len() + 1;
     for &i in indexed.iter().rev() {
         while hull.len() >= lower_len
-            && cross(pts2d[hull[hull.len() - 2]], pts2d[hull[hull.len() - 1]], pts2d[i]) <= 0.0
+            && cross(
+                pts2d[hull[hull.len() - 2]],
+                pts2d[hull[hull.len() - 1]],
+                pts2d[i],
+            ) <= 0.0
         {
             hull.pop();
         }
@@ -1223,9 +1226,8 @@ fn build_cutter_planes(active: &ActiveDraw) -> Vec<BrushFaceData> {
     let half_v = (max_v - min_v) / 2.0;
     let half_depth = active.depth.abs() / 2.0;
 
-    let center_on_plane = plane.origin
-        + plane.axis_u * (min_u + max_u) / 2.0
-        + plane.axis_v * (min_v + max_v) / 2.0;
+    let center_on_plane =
+        plane.origin + plane.axis_u * (min_u + max_u) / 2.0 + plane.axis_v * (min_v + max_v) / 2.0;
     let center = center_on_plane + plane.normal * active.depth / 2.0;
 
     vec![
@@ -1326,8 +1328,7 @@ fn subtract_drawn_brush(active: &ActiveDraw, commands: &mut Commands) {
                 if world_verts.len() < 4 {
                     continue;
                 }
-                let centroid: Vec3 =
-                    world_verts.iter().sum::<Vec3>() / world_verts.len() as f32;
+                let centroid: Vec3 = world_verts.iter().sum::<Vec3>() / world_verts.len() as f32;
 
                 // Convert to local space around centroid
                 let local_faces: Vec<BrushFaceData> = fragment_faces
@@ -1376,8 +1377,7 @@ fn subtract_drawn_brush(active: &ActiveDraw, commands: &mut Commands) {
         // Clean up selection: remove originals that are about to be despawned
         {
             let mut selection = world.resource_mut::<Selection>();
-            let despawning: Vec<Entity> =
-                original_snapshots.iter().map(|(e, _)| *e).collect();
+            let despawning: Vec<Entity> = original_snapshots.iter().map(|(e, _)| *e).collect();
             selection.entities.retain(|e| !despawning.contains(e));
         }
         for (entity, _) in &original_snapshots {

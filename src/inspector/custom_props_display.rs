@@ -3,20 +3,18 @@ use crate::custom_properties::{CustomProperties, PropertyValue, SetCustomPropert
 
 use bevy::prelude::*;
 use bevy::ui_widgets::observe;
+use jackdaw_feathers::combobox::{ComboBoxSelectedIndex, combobox_with_selected};
 use jackdaw_feathers::{
     checkbox::{CheckboxCommitEvent, CheckboxProps, checkbox},
     color_picker::{ColorPickerCommitEvent, ColorPickerProps, color_picker},
     icons::Icon,
-    numeric_input, text_input, tokens,
+    text_edit::{self, TextEditCommitEvent, TextEditProps, TextEditValue},
+    tokens,
 };
-use jackdaw_widgets::numeric_input::NumericValueChanged;
-use jackdaw_widgets::text_input::{EnteredText, TextInput};
-use jackdaw_feathers::combobox::{ComboBoxSelectedIndex, combobox_with_selected};
 
 use super::{
-    AXIS_X_COLOR, AXIS_Y_COLOR, AXIS_Z_COLOR,
-    CustomPropertyAddRow, CustomPropertyBinding, CustomPropertyNameInput,
-    CustomPropertyTypeSelector, rebuild_inspector,
+    AXIS_X_COLOR, AXIS_Y_COLOR, AXIS_Z_COLOR, CustomPropertyAddRow, CustomPropertyBinding,
+    CustomPropertyNameInput, CustomPropertyTypeSelector, rebuild_inspector,
 };
 
 pub(super) fn spawn_custom_properties_display(
@@ -63,108 +61,144 @@ pub(super) fn spawn_custom_properties_display(
         match prop_value {
             PropertyValue::Bool(val) => {
                 let checked = *val;
-                commands
-                    .spawn((
-                        checkbox(CheckboxProps::new("").checked(checked), editor_font, icon_font),
-                        CustomPropertyBinding {
-                            source_entity,
-                            property_name: name,
-                        },
-                        ChildOf(row),
-                    ));
+                commands.spawn((
+                    checkbox(
+                        CheckboxProps::new("").checked(checked),
+                        editor_font,
+                        icon_font,
+                    ),
+                    CustomPropertyBinding {
+                        source_entity,
+                        property_name: name,
+                    },
+                    ChildOf(row),
+                ));
             }
             PropertyValue::Int(val) => {
-                let n = name.clone();
-                commands
-                    .spawn((numeric_input::numeric_input(*val as f64), ChildOf(row)))
-                    .observe(
-                        move |changed: On<NumericValueChanged>, mut commands: Commands| {
-                            let n = n.clone();
-                            let val = changed.value as i64;
-                            commands.queue(move |world: &mut World| {
-                                apply_custom_property_with_undo(
-                                    world,
-                                    source_entity,
-                                    &n,
-                                    PropertyValue::Int(val),
-                                );
-                            });
-                        },
-                    );
+                commands.spawn((
+                    text_edit::text_edit(
+                        TextEditProps::default()
+                            .numeric_f32()
+                            .grow()
+                            .with_default_value((*val).to_string()),
+                    ),
+                    CustomPropertyBinding {
+                        source_entity,
+                        property_name: name,
+                    },
+                    ChildOf(row),
+                ));
             }
             PropertyValue::Float(val) => {
-                let n = name.clone();
-                commands
-                    .spawn((numeric_input::numeric_input(*val), ChildOf(row)))
-                    .observe(
-                        move |changed: On<NumericValueChanged>, mut commands: Commands| {
-                            let n = n.clone();
-                            let val = changed.value;
-                            commands.queue(move |world: &mut World| {
-                                apply_custom_property_with_undo(
-                                    world,
-                                    source_entity,
-                                    &n,
-                                    PropertyValue::Float(val),
-                                );
-                            });
-                        },
-                    );
+                commands.spawn((
+                    text_edit::text_edit(
+                        TextEditProps::default()
+                            .numeric_f32()
+                            .grow()
+                            .with_default_value(val.to_string()),
+                    ),
+                    CustomPropertyBinding {
+                        source_entity,
+                        property_name: name,
+                    },
+                    ChildOf(row),
+                ));
             }
             PropertyValue::String(val) => {
-                let n = name.clone();
-                let input = commands
-                    .spawn((text_input::text_input(""), ChildOf(row)))
-                    .insert(TextInput::new(val.clone()))
-                    .observe(
-                        move |text: On<EnteredText>, mut commands: Commands| {
-                            let n = n.clone();
-                            let value = text.value.clone();
-                            commands.queue(move |world: &mut World| {
-                                apply_custom_property_with_undo(
-                                    world,
-                                    source_entity,
-                                    &n,
-                                    PropertyValue::String(value),
-                                );
-                            });
-                        },
-                    )
-                    .id();
-                commands
-                    .entity(input)
-                    .entry::<Node>()
-                    .and_modify(|mut node| {
-                        node.width = Val::Auto;
-                        node.flex_grow = 1.0;
-                        node.flex_basis = Val::Px(0.0);
-                    });
+                commands.spawn((
+                    text_edit::text_edit(
+                        TextEditProps::default()
+                            .grow()
+                            .with_default_value(val.clone())
+                            .allow_empty(),
+                    ),
+                    CustomPropertyBinding {
+                        source_entity,
+                        property_name: name,
+                    },
+                    ChildOf(row),
+                ));
             }
             PropertyValue::Vec2(val) => {
                 let v = *val;
                 let n_x = name.clone();
                 let n_y = name.clone();
-                spawn_custom_axis(commands, row, "X", v.x as f64, AXIS_X_COLOR, source_entity, n_x, |new_f, old| {
-                    if let PropertyValue::Vec2(v) = old { v.x = new_f as f32; }
-                });
-                spawn_custom_axis(commands, row, "Y", v.y as f64, AXIS_Y_COLOR, source_entity, n_y, |new_f, old| {
-                    if let PropertyValue::Vec2(v) = old { v.y = new_f as f32; }
-                });
+                spawn_custom_axis(
+                    commands,
+                    row,
+                    "X",
+                    v.x as f64,
+                    AXIS_X_COLOR,
+                    source_entity,
+                    n_x,
+                    |new_f, old| {
+                        if let PropertyValue::Vec2(v) = old {
+                            v.x = new_f as f32;
+                        }
+                    },
+                );
+                spawn_custom_axis(
+                    commands,
+                    row,
+                    "Y",
+                    v.y as f64,
+                    AXIS_Y_COLOR,
+                    source_entity,
+                    n_y,
+                    |new_f, old| {
+                        if let PropertyValue::Vec2(v) = old {
+                            v.y = new_f as f32;
+                        }
+                    },
+                );
             }
             PropertyValue::Vec3(val) => {
                 let v = *val;
                 let n_x = name.clone();
                 let n_y = name.clone();
                 let n_z = name.clone();
-                spawn_custom_axis(commands, row, "X", v.x as f64, AXIS_X_COLOR, source_entity, n_x, |new_f, old| {
-                    if let PropertyValue::Vec3(v) = old { v.x = new_f as f32; }
-                });
-                spawn_custom_axis(commands, row, "Y", v.y as f64, AXIS_Y_COLOR, source_entity, n_y, |new_f, old| {
-                    if let PropertyValue::Vec3(v) = old { v.y = new_f as f32; }
-                });
-                spawn_custom_axis(commands, row, "Z", v.z as f64, AXIS_Z_COLOR, source_entity, n_z, |new_f, old| {
-                    if let PropertyValue::Vec3(v) = old { v.z = new_f as f32; }
-                });
+                spawn_custom_axis(
+                    commands,
+                    row,
+                    "X",
+                    v.x as f64,
+                    AXIS_X_COLOR,
+                    source_entity,
+                    n_x,
+                    |new_f, old| {
+                        if let PropertyValue::Vec3(v) = old {
+                            v.x = new_f as f32;
+                        }
+                    },
+                );
+                spawn_custom_axis(
+                    commands,
+                    row,
+                    "Y",
+                    v.y as f64,
+                    AXIS_Y_COLOR,
+                    source_entity,
+                    n_y,
+                    |new_f, old| {
+                        if let PropertyValue::Vec3(v) = old {
+                            v.y = new_f as f32;
+                        }
+                    },
+                );
+                spawn_custom_axis(
+                    commands,
+                    row,
+                    "Z",
+                    v.z as f64,
+                    AXIS_Z_COLOR,
+                    source_entity,
+                    n_z,
+                    |new_f, old| {
+                        if let PropertyValue::Vec3(v) = old {
+                            v.z = new_f as f32;
+                        }
+                    },
+                );
             }
             PropertyValue::Color(val) => {
                 let srgba = val.to_srgba();
@@ -180,7 +214,8 @@ pub(super) fn spawn_custom_properties_display(
                             let color = event.color;
                             let n = n.clone();
                             commands.queue(move |world: &mut World| {
-                                let new_color = Color::srgba(color[0], color[1], color[2], color[3]);
+                                let new_color =
+                                    Color::srgba(color[0], color[1], color[2], color[3]);
                                 apply_custom_property_with_undo(
                                     world,
                                     source_entity,
@@ -217,6 +252,14 @@ pub(super) fn spawn_custom_properties_display(
     spawn_add_property_row(commands, parent, source_entity, editor_font, icon_font);
 }
 
+/// Marker that links a custom property axis input to its property name and mutation function.
+#[derive(Component)]
+pub(super) struct CustomAxisBinding {
+    source_entity: Entity,
+    property_name: String,
+    mutate: fn(f64, &mut PropertyValue),
+}
+
 fn spawn_custom_axis(
     commands: &mut Commands,
     parent: Entity,
@@ -241,27 +284,20 @@ fn spawn_custom_axis(
         ChildOf(parent),
     ));
 
-    let n = property_name;
-    commands
-        .spawn((numeric_input::numeric_input(value), ChildOf(parent)))
-        .observe(
-            move |changed: On<NumericValueChanged>, mut commands: Commands| {
-                let n = n.clone();
-                let new_f = changed.value;
-                commands.queue(move |world: &mut World| {
-                    // Read current value, mutate the axis, apply
-                    let Some(cp) = world.get::<CustomProperties>(source_entity) else {
-                        return;
-                    };
-                    let Some(current) = cp.properties.get(&n) else {
-                        return;
-                    };
-                    let mut new_val = current.clone();
-                    mutate(new_f, &mut new_val);
-                    apply_custom_property_with_undo(world, source_entity, &n, new_val);
-                });
-            },
-        );
+    commands.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .numeric_f32()
+                .grow()
+                .with_default_value(value.to_string()),
+        ),
+        CustomAxisBinding {
+            source_entity,
+            property_name,
+            mutate,
+        },
+        ChildOf(parent),
+    ));
 }
 
 fn spawn_add_property_row(
@@ -287,24 +323,27 @@ fn spawn_add_property_row(
         .id();
 
     // Name input
-    commands
-        .spawn((
-            CustomPropertyNameInput,
-            text_input::text_input("name..."),
-            ChildOf(row),
-        ));
+    commands.spawn((
+        CustomPropertyNameInput,
+        text_edit::text_edit(
+            TextEditProps::default()
+                .grow()
+                .with_placeholder("name...")
+                .allow_empty(),
+        ),
+        ChildOf(row),
+    ));
 
     // Type selector ComboBox
     let type_names: Vec<String> = PropertyValue::all_type_names()
         .iter()
         .map(|s| s.to_string())
         .collect();
-    commands
-        .spawn((
-            CustomPropertyTypeSelector,
-            combobox_with_selected(type_names, 2), // default to "Float"
-            ChildOf(row),
-        ));
+    commands.spawn((
+        CustomPropertyTypeSelector,
+        combobox_with_selected(type_names, 2), // default to "Float"
+        ChildOf(row),
+    ));
 
     // Confirm button
     let font = icon_font.clone();
@@ -329,11 +368,11 @@ fn spawn_add_property_row(
 fn add_custom_property_from_ui(world: &mut World, source_entity: Entity) {
     // Read the name input value
     let name = {
-        let mut query = world.query_filtered::<&TextInput, With<CustomPropertyNameInput>>();
+        let mut query = world.query_filtered::<&TextEditValue, With<CustomPropertyNameInput>>();
         let Some(input) = query.iter(world).next() else {
             return;
         };
-        let name = input.value.trim().to_string();
+        let name = input.0.trim().to_string();
         if name.is_empty() {
             return;
         }
@@ -342,7 +381,8 @@ fn add_custom_property_from_ui(world: &mut World, source_entity: Entity) {
 
     // Read the type selector
     let type_name = {
-        let mut query = world.query_filtered::<&ComboBoxSelectedIndex, With<CustomPropertyTypeSelector>>();
+        let mut query =
+            world.query_filtered::<&ComboBoxSelectedIndex, With<CustomPropertyTypeSelector>>();
         let Some(index) = query.iter(world).next() else {
             return;
         };
@@ -424,6 +464,70 @@ fn apply_custom_property_with_undo(
     let mut history = world.resource_mut::<CommandHistory>();
     history.undo_stack.push(Box::new(cmd));
     history.redo_stack.clear();
+}
+
+/// Handle TextEditCommitEvent for custom property numeric/string fields + axis bindings.
+pub(crate) fn on_custom_property_text_commit(
+    event: On<TextEditCommitEvent>,
+    bindings: Query<&CustomPropertyBinding>,
+    axis_bindings: Query<&CustomAxisBinding>,
+    child_of_query: Query<&ChildOf>,
+    mut commands: Commands,
+) {
+    // Walk up from the committed entity to find a CustomPropertyBinding or CustomAxisBinding
+    let mut current = event.entity;
+    for _ in 0..4 {
+        let Ok(child_of) = child_of_query.get(current) else {
+            break;
+        };
+        let parent = child_of.parent();
+
+        // Check for direct property binding (Int/Float/String)
+        if let Ok(binding) = bindings.get(parent) {
+            let source = binding.source_entity;
+            let name = binding.property_name.clone();
+            let text = event.text.clone();
+            commands.queue(move |world: &mut World| {
+                // Determine current type and apply accordingly
+                let Some(cp) = world.get::<CustomProperties>(source) else {
+                    return;
+                };
+                let Some(current_val) = cp.properties.get(&name) else {
+                    return;
+                };
+                let new_val = match current_val {
+                    PropertyValue::Int(_) => PropertyValue::Int(text.parse().unwrap_or(0)),
+                    PropertyValue::Float(_) => PropertyValue::Float(text.parse().unwrap_or(0.0)),
+                    PropertyValue::String(_) => PropertyValue::String(text),
+                    other => other.clone(),
+                };
+                apply_custom_property_with_undo(world, source, &name, new_val);
+            });
+            return;
+        }
+
+        // Check for axis binding (Vec2/Vec3 component)
+        if let Ok(axis) = axis_bindings.get(parent) {
+            let source = axis.source_entity;
+            let name = axis.property_name.clone();
+            let mutate = axis.mutate;
+            let new_f: f64 = event.text.parse().unwrap_or(0.0);
+            commands.queue(move |world: &mut World| {
+                let Some(cp) = world.get::<CustomProperties>(source) else {
+                    return;
+                };
+                let Some(current) = cp.properties.get(&name) else {
+                    return;
+                };
+                let mut new_val = current.clone();
+                mutate(new_f, &mut new_val);
+                apply_custom_property_with_undo(world, source, &name, new_val);
+            });
+            return;
+        }
+
+        current = parent;
+    }
 }
 
 /// Handle checkbox commit for custom property booleans.

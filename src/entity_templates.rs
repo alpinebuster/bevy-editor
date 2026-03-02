@@ -12,10 +12,10 @@ use jackdaw_jsn::format::JsnEntity;
 use serde::de::DeserializeSeed;
 
 use crate::{
-    commands::{collect_entity_ids, CommandHistory, DespawnEntity, EditorCommand},
+    EditorEntity,
+    commands::{CommandHistory, DespawnEntity, EditorCommand, collect_entity_ids},
     scene_io::should_skip_component,
     selection::{Selected, Selection},
-    EditorEntity,
 };
 
 pub struct EntityTemplatesPlugin;
@@ -49,11 +49,8 @@ pub fn save_entity_template(world: &mut World, name: &str) {
     collect_entity_ids(world, primary, &mut entities);
 
     // Build entity → index map for parent references
-    let index_map: HashMap<Entity, usize> = entities
-        .iter()
-        .enumerate()
-        .map(|(i, &e)| (e, i))
-        .collect();
+    let index_map: HashMap<Entity, usize> =
+        entities.iter().enumerate().map(|(i, &e)| (e, i)).collect();
 
     let registry = world.resource::<AppTypeRegistry>().clone();
     let registry = registry.read();
@@ -254,10 +251,12 @@ pub fn instantiate_template(world: &mut World, path: &str, position: Vec3) {
     }
 
     // Select new root entities
-    let mut selection = world.resource_mut::<Selection>();
-    let old_selected = std::mem::take(&mut selection.entities);
-    selection.entities = roots.clone();
-    drop(selection);
+    let old_selected = {
+        let mut selection = world.resource_mut::<Selection>();
+        let old = std::mem::take(&mut selection.entities);
+        selection.entities = roots.clone();
+        old
+    };
 
     // Deselect old entities
     for &e in &old_selected {

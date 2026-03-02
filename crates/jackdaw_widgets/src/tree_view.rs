@@ -184,7 +184,9 @@ fn maintain_tree_index(
     for removed_entity in removed.read() {
         // Scan the map to find which source entity maps to this removed tree row.
         // This is O(n) but only runs on removal frames, not every frame.
-        let source = index.map.iter()
+        let source = index
+            .map
+            .iter()
             .find(|(_, tree_row)| **tree_row == removed_entity)
             .map(|(source, _)| *source);
         if let Some(source) = source {

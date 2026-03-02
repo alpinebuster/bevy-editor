@@ -1,9 +1,9 @@
-mod geometry;
 mod csg;
-mod hull;
-mod mesh;
-mod interaction;
+mod geometry;
 mod gizmo_overlay;
+mod hull;
+mod interaction;
+mod mesh;
 
 use std::collections::HashMap;
 
@@ -11,14 +11,16 @@ use bevy::prelude::*;
 
 use crate::commands::EditorCommand;
 
-pub use jackdaw_jsn::{Brush, BrushFaceData, BrushPlane};
+pub use self::csg::{
+    brush_planes_to_world, brushes_intersect, clean_degenerate_faces, subtract_brush,
+};
 pub use self::geometry::{compute_brush_geometry, compute_face_tangent_axes};
-pub use self::csg::{brush_planes_to_world, brushes_intersect, subtract_brush, clean_degenerate_faces};
 pub use self::hull::HullFace;
 pub(crate) use self::hull::merge_hull_triangles;
 pub(crate) use self::interaction::{
-    BrushDragState, VertexDragState, VertexDragConstraint, EdgeDragState, ClipState,
+    BrushDragState, ClipState, EdgeDragState, VertexDragConstraint, VertexDragState,
 };
+pub use jackdaw_jsn::{Brush, BrushFaceData, BrushPlane};
 
 /// Cached computed geometry (NOT serialized, rebuilt from Brush).
 #[derive(Component)]

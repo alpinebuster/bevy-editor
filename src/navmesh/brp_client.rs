@@ -165,6 +165,7 @@ fn poll_navmesh_input(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
+    mut gizmo_assets: ResMut<Assets<GizmoAsset>>,
     existing_visuals: Query<Entity, With<SceneVisualMesh>>,
     existing_obstacles: Query<Entity, With<ObstacleGizmo>>,
     regions: Query<Entity, With<jackdaw_jsn::NavmeshRegion>>,
@@ -209,7 +210,15 @@ fn poll_navmesh_input(
     commands.spawn((
         Transform::default(),
         Mesh3d(meshes.add(mesh)),
-        Visibility::Hidden,
+        Gizmo {
+            handle: gizmo_assets.add(GizmoAsset::default()),
+            line_config: GizmoLineConfig {
+                width: 1.5,
+                perspective: true,
+                ..default()
+            },
+            ..default()
+        },
         ObstacleGizmo,
         EditorEntity,
     ));

@@ -6,7 +6,10 @@ pub mod types;
 use bevy::prelude::*;
 
 // Re-export core types for consumer convenience
-pub use types::{Brush, BrushFaceData, BrushPlane, CustomProperties, GltfSource, NavmeshRegion, PropertyValue, Terrain};
+pub use types::{
+    Brush, BrushFaceData, BrushPlane, CustomProperties, GltfSource, NavmeshRegion, PropertyValue,
+    Terrain,
+};
 
 // Re-export geometry crate
 pub use jackdaw_geometry;

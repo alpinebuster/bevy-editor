@@ -16,7 +16,11 @@ fn spawn_scene(mut commands: Commands) {
             illuminance: 10000.0,
             ..default()
         },
-        Transform::from_xyz(10.0, 20.0, 10.0)
-            .with_rotation(Quat::from_euler(EulerRot::XYZ, -0.8, 0.4, 0.0)),
+        Transform::from_xyz(10.0, 20.0, 10.0).with_rotation(Quat::from_euler(
+            EulerRot::XYZ,
+            -0.8,
+            0.4,
+            0.0,
+        )),
     ));
 }

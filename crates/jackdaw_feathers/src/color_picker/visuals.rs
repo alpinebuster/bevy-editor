@@ -4,8 +4,8 @@ use super::color_math::hsv_to_rgb;
 use super::materials::{AlphaSliderMaterial, CheckerboardMaterial, HsvRectMaterial};
 use super::{
     AlphaHandle, AlphaHandleMaterial, AlphaMaterialNode, AlphaSlider, ColorPickerState,
-    HsvRectHandle, HsvRectMaterialNode, HsvRectangle, HueHandle, HueSlider,
-    PreviewSwatchMaterial, TriggerLabel, TriggerSwatchMaterial, HANDLE_SIZE,
+    HANDLE_SIZE, HsvRectHandle, HsvRectMaterialNode, HsvRectangle, HueHandle, HueSlider,
+    PreviewSwatchMaterial, TriggerLabel, TriggerSwatchMaterial,
 };
 
 pub(super) fn update_color_picker_visuals(

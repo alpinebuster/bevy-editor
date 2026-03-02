@@ -1,20 +1,19 @@
+use bevy::input_focus::InputFocus;
 use bevy::{
     picking::mesh_picking::ray_cast::{MeshRayCast, MeshRayCastSettings, RayCastVisibility},
     prelude::*,
     ui::UiGlobalTransform,
 };
-use bevy::input_focus::InputFocus;
 use jackdaw_camera::JackdawCameraSettings;
 use jackdaw_feathers::context_menu::spawn_context_menu;
 use jackdaw_widgets::context_menu::{ContextMenuAction, ContextMenuCloseSet, ContextMenuState};
 
 use crate::{
-    entity_ops,
+    EditorEntity, entity_ops,
     gizmos::GizmoDragState,
     modal_transform::{ModalTransformState, ViewportDragState},
     selection::{Selected, Selection},
     viewport::SceneViewport,
-    EditorEntity,
 };
 
 pub struct ViewportSelectPlugin;
@@ -73,7 +72,10 @@ fn handle_viewport_click(
         || vp_drag.active.is_some()
         || *edit_mode != crate::brush::EditMode::Object
         || draw_state.active.is_some()
-        || matches!(*terrain_edit_mode, crate::terrain::TerrainEditMode::Sculpt(_))
+        || matches!(
+            *terrain_edit_mode,
+            crate::terrain::TerrainEditMode::Sculpt(_)
+        )
     {
         return;
     }
@@ -117,13 +119,13 @@ fn handle_viewport_click(
     let mut best_entity = None;
 
     if let Ok(ray) = camera.viewport_to_world(cam_tf, local_cursor) {
-        let settings = MeshRayCastSettings::default()
-            .with_visibility(RayCastVisibility::Any);
+        let settings = MeshRayCastSettings::default().with_visibility(RayCastVisibility::Any);
         let hits = ray_cast.cast_ray(ray, &settings);
 
         // Find the first hit that resolves to a scene entity (skip editor entities)
         for (hit_entity, _) in hits {
-            if let Some(ancestor) = find_selectable_ancestor(*hit_entity, &scene_entities, &parents) {
+            if let Some(ancestor) = find_selectable_ancestor(*hit_entity, &scene_entities, &parents)
+            {
                 best_entity = Some(ancestor);
                 break;
             }
@@ -261,7 +263,11 @@ fn handle_viewport_right_click(
     mut commands: Commands,
     mut ray_cast: MeshRayCast,
 ) {
-    if !mouse.just_pressed(MouseButton::Right) || gizmo_drag.active || modal.active.is_some() || draw_state.active.is_some() {
+    if !mouse.just_pressed(MouseButton::Right)
+        || gizmo_drag.active
+        || modal.active.is_some()
+        || draw_state.active.is_some()
+    {
         return;
     }
 
@@ -301,12 +307,12 @@ fn handle_viewport_right_click(
     let mut best_entity = None;
 
     if let Ok(ray) = camera.viewport_to_world(cam_tf, local_cursor) {
-        let settings = MeshRayCastSettings::default()
-            .with_visibility(RayCastVisibility::Any);
+        let settings = MeshRayCastSettings::default().with_visibility(RayCastVisibility::Any);
         let hits = ray_cast.cast_ray(ray, &settings);
 
         for (hit_entity, _) in hits {
-            if let Some(ancestor) = find_selectable_ancestor(*hit_entity, &scene_entities, &parents) {
+            if let Some(ancestor) = find_selectable_ancestor(*hit_entity, &scene_entities, &parents)
+            {
                 best_entity = Some(ancestor);
                 break;
             }

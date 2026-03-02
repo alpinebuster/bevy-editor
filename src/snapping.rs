@@ -213,7 +213,10 @@ fn handle_grid_size_keys(
     // Shift+Scroll is used for brush resize when terrain sculpt is active;
     // only allow grid resize via Shift+Scroll when NOT sculpting.
     let shift_grid = shift
-        && !matches!(*terrain_edit_mode, crate::terrain::TerrainEditMode::Sculpt(_));
+        && !matches!(
+            *terrain_edit_mode,
+            crate::terrain::TerrainEditMode::Sculpt(_)
+        );
 
     let mut changed = false;
 

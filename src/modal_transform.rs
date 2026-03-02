@@ -1,13 +1,19 @@
-use bevy::{input_focus::InputFocus, picking::mesh_picking::ray_cast::{MeshRayCast, MeshRayCastSettings, RayCastVisibility}, prelude::*, ui::UiGlobalTransform, window::{CursorGrabMode, CursorOptions}};
+use bevy::{
+    input_focus::InputFocus,
+    picking::mesh_picking::ray_cast::{MeshRayCast, MeshRayCastSettings, RayCastVisibility},
+    prelude::*,
+    ui::UiGlobalTransform,
+    window::{CursorGrabMode, CursorOptions},
+};
 
 use crate::{
+    EditorEntity,
     commands::{CommandHistory, SetTransform},
     gizmos::{GizmoAxis, GizmoDragState, GizmoHoverState, GizmoMode},
     selection::{Selected, Selection},
     snapping::SnapSettings,
     viewport::SceneViewport,
     viewport_util::window_to_viewport_cursor,
-    EditorEntity,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -297,7 +303,7 @@ fn modal_grab(
     camera: &Camera,
     cam_tf: &GlobalTransform,
     snap_settings: &SnapSettings,
-    _viewport_query: &Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>,  // kept for API compat
+    _viewport_query: &Query<(&ComputedNode, &UiGlobalTransform), With<SceneViewport>>, // kept for API compat
 
     ctrl: bool,
 ) {
@@ -480,7 +486,10 @@ fn viewport_drag_detect(
     }
 
     // Block viewport drag during terrain sculpt mode
-    if matches!(*terrain_edit_mode, crate::terrain::TerrainEditMode::Sculpt(_)) {
+    if matches!(
+        *terrain_edit_mode,
+        crate::terrain::TerrainEditMode::Sculpt(_)
+    ) {
         return;
     }
 
@@ -516,7 +525,8 @@ fn viewport_drag_detect(
         return;
     };
 
-    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query) else {
+    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
+    else {
         return;
     };
 
@@ -524,8 +534,7 @@ fn viewport_drag_detect(
     let Ok(ray) = camera.viewport_to_world(cam_tf, viewport_cursor) else {
         return;
     };
-    let settings = MeshRayCastSettings::default()
-        .with_visibility(RayCastVisibility::Any);
+    let settings = MeshRayCastSettings::default().with_visibility(RayCastVisibility::Any);
     let hits = ray_cast.cast_ray(ray, &settings);
 
     let mut hit_primary = false;
@@ -576,7 +585,10 @@ fn viewport_drag_update(
     }
 
     // Cancel pending drag if terrain sculpt mode became active
-    if matches!(*terrain_edit_mode, crate::terrain::TerrainEditMode::Sculpt(_)) {
+    if matches!(
+        *terrain_edit_mode,
+        crate::terrain::TerrainEditMode::Sculpt(_)
+    ) {
         drag_state.pending = None;
         return;
     }
@@ -626,8 +638,8 @@ fn viewport_drag_update(
     let alt = keyboard.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
     let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
 
-    let viewport_cursor = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
-        .unwrap_or(cursor_pos);
+    let viewport_cursor =
+        window_to_viewport_cursor(cursor_pos, camera, &viewport_query).unwrap_or(cursor_pos);
 
     let start_pos = active.start_transform.translation;
     let cam_dist = (cam_tf.translation() - start_pos).length();

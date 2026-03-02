@@ -2,10 +2,13 @@ use bevy::prelude::*;
 use lucide_icons::Icon;
 
 use crate::button::{
-    button, icon_button, ButtonClickEvent, ButtonProps, ButtonVariant, IconButtonProps,
+    ButtonClickEvent, ButtonProps, ButtonVariant, IconButtonProps, button, icon_button,
 };
 use crate::icons::EditorFont;
-use crate::tokens::{BACKGROUND_COLOR, BORDER_COLOR, TEXT_DISPLAY_COLOR, TEXT_MUTED_COLOR, TEXT_SIZE_LG, TEXT_SIZE_XL};
+use crate::tokens::{
+    BACKGROUND_COLOR, BORDER_COLOR, TEXT_DISPLAY_COLOR, TEXT_MUTED_COLOR, TEXT_SIZE_LG,
+    TEXT_SIZE_XL,
+};
 
 const BACKDROP_OPACITY: f32 = 0.8;
 

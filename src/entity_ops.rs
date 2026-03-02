@@ -11,9 +11,9 @@ use bevy::{
 };
 
 use crate::{
+    EditorEntity,
     commands::{CommandHistory, DespawnEntity, EditorCommand},
     selection::{Selected, Selection},
-    EditorEntity,
 };
 use bevy::input_focus::InputFocus;
 
@@ -157,10 +157,7 @@ fn apply_last_texture(entity: Entity) -> impl FnOnce(&mut World) {
 
 /// World-access version of `create_entity` — used from menu actions and other deferred contexts.
 pub fn create_entity_in_world(world: &mut World, template: EntityTemplate) {
-    let mut system_state: SystemState<(
-        Commands,
-        ResMut<Selection>,
-    )> = SystemState::new(world);
+    let mut system_state: SystemState<(Commands, ResMut<Selection>)> = SystemState::new(world);
     let (mut commands, mut selection) = system_state.get_mut(world);
     create_entity(&mut commands, template, &mut selection);
     system_state.apply(world);
@@ -353,8 +350,7 @@ fn handle_entity_keys(world: &mut World) {
     let keyboard = world.resource::<ButtonInput<KeyCode>>();
     let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     let alt = keyboard.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
-    let delete_pressed = keyboard.just_pressed(KeyCode::Delete)
-        || keyboard.just_pressed(KeyCode::Backspace);
+    let delete_pressed = keyboard.just_pressed(KeyCode::Delete);
     let d_pressed = keyboard.just_pressed(KeyCode::KeyD);
     let g_pressed = keyboard.just_pressed(KeyCode::KeyG);
     let r_pressed = keyboard.just_pressed(KeyCode::KeyR);
@@ -407,7 +403,9 @@ fn handle_entity_keys(world: &mut World) {
         rotate_selected(world, rotation);
     } else if arrow_pressed && !alt {
         // Arrow keys: grid-unit movement
-        let grid_size = world.resource::<crate::snapping::SnapSettings>().grid_size();
+        let grid_size = world
+            .resource::<crate::snapping::SnapSettings>()
+            .grid_size();
         let offset = if left {
             Vec3::new(-grid_size, 0.0, 0.0)
         } else if right {
@@ -611,10 +609,7 @@ fn copy_components(world: &mut World) {
 
         // Skip internal types
         let path = registration.type_info().type_path_table().path();
-        if path.starts_with("jackdaw")
-            || path.contains("ChildOf")
-            || path.contains("Children")
-        {
+        if path.starts_with("jackdaw") || path.contains("ChildOf") || path.contains("Children") {
             continue;
         }
 
@@ -675,11 +670,7 @@ fn paste_components(world: &mut World) {
                     .unwrap();
                 existing.into_inner().apply(value.as_ref());
             } else {
-                reflect_component.insert(
-                    &mut world.entity_mut(entity),
-                    value.as_ref(),
-                    &registry,
-                );
+                reflect_component.insert(&mut world.entity_mut(entity), value.as_ref(), &registry);
             }
         }
     }
@@ -758,10 +749,7 @@ fn get_assets_base_dir() -> Option<std::path::PathBuf> {
     } else if let Ok(dir) = std::env::var("CARGO_MANIFEST_DIR") {
         std::path::PathBuf::from(dir)
     } else {
-        std::env::current_exe()
-            .ok()?
-            .parent()?
-            .to_path_buf()
+        std::env::current_exe().ok()?.parent()?.to_path_buf()
     };
     Some(base.join("assets"))
 }

@@ -115,9 +115,7 @@ fn toggle_toolbar_visibility(
         return;
     }
 
-    let should_show = selection
-        .primary()
-        .is_some_and(|e| terrains.contains(e));
+    let should_show = selection.primary().is_some_and(|e| terrains.contains(e));
 
     for mut node in &mut toolbar {
         node.display = if should_show {
@@ -144,12 +142,22 @@ fn update_terrain_tool_highlights(
     for (button, mut bg) in &mut buttons {
         let active = matches!(
             (&*edit_mode, button),
-            (TerrainEditMode::Sculpt(jackdaw_terrain::SculptTool::Raise), TerrainToolButton::Raise)
-                | (TerrainEditMode::Sculpt(jackdaw_terrain::SculptTool::Lower), TerrainToolButton::Lower)
-                | (TerrainEditMode::Sculpt(jackdaw_terrain::SculptTool::Flatten), TerrainToolButton::Flatten)
-                | (TerrainEditMode::Sculpt(jackdaw_terrain::SculptTool::Smooth), TerrainToolButton::Smooth)
-                | (TerrainEditMode::Sculpt(jackdaw_terrain::SculptTool::Noise), TerrainToolButton::Noise)
-                | (TerrainEditMode::Generate, TerrainToolButton::Generate)
+            (
+                TerrainEditMode::Sculpt(jackdaw_terrain::SculptTool::Raise),
+                TerrainToolButton::Raise
+            ) | (
+                TerrainEditMode::Sculpt(jackdaw_terrain::SculptTool::Lower),
+                TerrainToolButton::Lower
+            ) | (
+                TerrainEditMode::Sculpt(jackdaw_terrain::SculptTool::Flatten),
+                TerrainToolButton::Flatten
+            ) | (
+                TerrainEditMode::Sculpt(jackdaw_terrain::SculptTool::Smooth),
+                TerrainToolButton::Smooth
+            ) | (
+                TerrainEditMode::Sculpt(jackdaw_terrain::SculptTool::Noise),
+                TerrainToolButton::Noise
+            ) | (TerrainEditMode::Generate, TerrainToolButton::Generate)
         );
         bg.0 = if active {
             tokens::SELECTED_BG

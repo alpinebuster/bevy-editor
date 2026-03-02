@@ -3,7 +3,7 @@ use bevy::{
     image::ImageSampler,
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages},
-    ui::{widget::ViewportNode, UiGlobalTransform},
+    ui::{UiGlobalTransform, widget::ViewportNode},
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 use jackdaw_camera::{JackdawCameraPlugin, JackdawCameraSettings};
@@ -22,16 +22,10 @@ pub struct ViewportPlugin;
 
 impl Plugin for ViewportPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            JackdawCameraPlugin,
-            InfiniteGridPlugin,
-        ))
-        .init_resource::<CameraBookmarks>()
-        .add_systems(Startup, setup_viewport.after(crate::spawn_layout))
-        .add_systems(Update, (
-            update_camera_enabled,
-            handle_camera_keys,
-        ));
+        app.add_plugins((JackdawCameraPlugin, InfiniteGridPlugin))
+            .init_resource::<CameraBookmarks>()
+            .add_systems(Startup, setup_viewport.after(crate::spawn_layout))
+            .add_systems(Update, (update_camera_enabled, handle_camera_keys));
     }
 }
 
@@ -74,7 +68,10 @@ fn setup_viewport(
         .id();
 
     // Spawn infinite grid (marked EditorEntity so it's hidden from hierarchy and undeletable)
-    commands.spawn((crate::EditorEntity, bevy_infinite_grid::InfiniteGridBundle::default()));
+    commands.spawn((
+        crate::EditorEntity,
+        bevy_infinite_grid::InfiniteGridBundle::default(),
+    ));
 
     // Attach ViewportNode to the SceneViewport UI entity
     commands
@@ -119,8 +116,8 @@ fn handle_viewport_drop(
         return;
     };
 
-    let position = cursor_to_ground_plane(cursor_pos, camera, cam_tf, &viewport_query)
-        .unwrap_or(Vec3::ZERO);
+    let position =
+        cursor_to_ground_plane(cursor_pos, camera, cam_tf, &viewport_query).unwrap_or(Vec3::ZERO);
 
     let ctrl = false; // No Ctrl check needed for drop placement
     let snapped_pos = snap_settings.snap_translate_vec3_if(position, ctrl);

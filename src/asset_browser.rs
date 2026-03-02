@@ -1,16 +1,13 @@
 use std::path::PathBuf;
 
-use bevy::{
-    feathers::theme::ThemedText,
-    prelude::*,
-};
+use bevy::{feathers::theme::ThemedText, prelude::*};
 use jackdaw_feathers::{file_browser, icons::IconFont, tokens};
 use jackdaw_widgets::file_browser::{FileBrowserItem, FileItemDoubleClicked};
 
 use crate::{
+    EditorEntity,
     brush::{BrushEditMode, BrushSelection, EditMode},
     texture_browser::{ApplyTextureToFaces, to_asset_relative_path},
-    EditorEntity,
 };
 
 pub struct AssetBrowserPlugin;
@@ -109,7 +106,9 @@ fn refresh_browser_on_change(
                 }
                 // Apply filter
                 if !state.filter.is_empty()
-                    && !file_name.to_lowercase().contains(&state.filter.to_lowercase())
+                    && !file_name
+                        .to_lowercase()
+                        .contains(&state.filter.to_lowercase())
                 {
                     return None;
                 }

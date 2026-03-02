@@ -6,11 +6,16 @@ use bevy::{
     prelude::*,
     ui_widgets::observe,
 };
-use jackdaw_feathers::{icons::{Icon, IconFont}, menu_bar, panel_header, popover, separator, split_panel, status_bar, text_input, tokens, tree_view::tree_container_drop_observers};
+use jackdaw_feathers::{
+    icons::{Icon, IconFont},
+    menu_bar, panel_header, popover, separator, split_panel, status_bar,
+    text_edit::{self, TextEditProps},
+    tokens,
+    tree_view::tree_container_drop_observers,
+};
 
 use crate::{
-    EditorEntity,
-    asset_browser,
+    EditorEntity, asset_browser,
     brush::{BrushEditMode, BrushSelection, EditMode},
     draw_brush::DrawBrushState,
     gizmos::{GizmoMode, GizmoSpace},
@@ -172,12 +177,10 @@ fn toolbar(icon_font: Handle<Font>) -> impl Bundle {
             toolbar_edit_button(Icon::Hexagon, EditToolButton::Face, f.clone()),
             toolbar_edit_button(Icon::ScissorsLineDashed, EditToolButton::Clip, f.clone()),
             // Spacer pushes help button to the right
-            (
-                Node {
-                    flex_grow: 1.0,
-                    ..Default::default()
-                },
-            ),
+            (Node {
+                flex_grow: 1.0,
+                ..Default::default()
+            },),
             // Keybind help button
             toolbar_help_button(f),
         ],
@@ -216,9 +219,11 @@ fn toolbar_button(icon: Icon, label: &str, mode: GizmoMode, font: Handle<Font>) 
                 ThemedText,
             )
         ],
-        observe(move |_: On<Pointer<Click>>, mut gizmo_mode: ResMut<GizmoMode>| {
-            *gizmo_mode = mode;
-        }),
+        observe(
+            move |_: On<Pointer<Click>>, mut gizmo_mode: ResMut<GizmoMode>| {
+                *gizmo_mode = mode;
+            },
+        ),
     )
 }
 
@@ -253,14 +258,12 @@ fn toolbar_space_button(icon_font: Handle<Font>) -> impl Bundle {
                 ThemedText,
             )
         ],
-        observe(
-            |_: On<Pointer<Click>>, mut space: ResMut<GizmoSpace>| {
-                *space = match *space {
-                    GizmoSpace::World => GizmoSpace::Local,
-                    GizmoSpace::Local => GizmoSpace::World,
-                };
-            },
-        ),
+        observe(|_: On<Pointer<Click>>, mut space: ResMut<GizmoSpace>| {
+            *space = match *space {
+                GizmoSpace::World => GizmoSpace::Local,
+                GizmoSpace::Local => GizmoSpace::World,
+            };
+        }),
     )
 }
 
@@ -314,9 +317,8 @@ fn toolbar_edit_button(icon: Icon, tool: EditToolButton, font: Handle<Font>) -> 
                                 brush_selection.edges.clear();
                             }
                             // Check if a brush is selected for append mode
-                            let append_target = selection
-                                .primary()
-                                .filter(|&e| brushes.contains(e));
+                            let append_target =
+                                selection.primary().filter(|&e| brushes.contains(e));
                             draw_state.active = Some(crate::draw_brush::ActiveDraw {
                                 corner1: Vec3::ZERO,
                                 corner2: Vec3::ZERO,
@@ -340,7 +342,10 @@ fn toolbar_edit_button(icon: Icon, tool: EditToolButton, font: Handle<Font>) -> 
                             });
                         }
                     }
-                    EditToolButton::Vertex | EditToolButton::Edge | EditToolButton::Face | EditToolButton::Clip => {
+                    EditToolButton::Vertex
+                    | EditToolButton::Edge
+                    | EditToolButton::Face
+                    | EditToolButton::Clip => {
                         // Cancel draw mode if active
                         draw_state.active = None;
 
@@ -370,7 +375,9 @@ fn toolbar_edit_button(icon: Icon, tool: EditToolButton, font: Handle<Font>) -> 
                             }
                         } else {
                             // Enter edit on primary if it's a brush
-                            if let Some(entity) = selection.primary().filter(|&e| brushes.contains(e)) {
+                            if let Some(entity) =
+                                selection.primary().filter(|&e| brushes.contains(e))
+                            {
                                 *edit_mode = EditMode::BrushEdit(target_mode);
                                 brush_selection.entity = Some(entity);
                                 brush_selection.faces.clear();
@@ -488,7 +495,7 @@ fn spawn_keybind_help_content(parent: &mut ChildSpawnerCommands) {
         (
             "Entity",
             &[
-                ("Delete / Backspace", "Delete"),
+                ("Delete", "Delete"),
                 ("Ctrl+D", "Duplicate"),
                 ("Ctrl+C / Ctrl+V", "Copy / Paste components"),
                 ("H", "Toggle visibility"),
@@ -611,7 +618,14 @@ fn entity_heiarchy() -> impl Bundle {
                     ..Default::default()
                 },
                 children![
-                    (HierarchyFilter, text_input::text_input("Filter entities")),
+                    (
+                        HierarchyFilter,
+                        text_edit::text_edit(
+                            TextEditProps::default()
+                                .with_placeholder("Filter entities")
+                                .allow_empty()
+                        )
+                    ),
                     (
                         HierarchyTreeContainer,
                         Node {
@@ -698,10 +712,18 @@ pub fn update_edit_tool_highlights(
         let active = match button {
             EditToolButton::Object => !draw_active && *edit_mode == EditMode::Object,
             EditToolButton::Draw => draw_active,
-            EditToolButton::Vertex => !draw_active && *edit_mode == EditMode::BrushEdit(BrushEditMode::Vertex),
-            EditToolButton::Edge => !draw_active && *edit_mode == EditMode::BrushEdit(BrushEditMode::Edge),
-            EditToolButton::Face => !draw_active && *edit_mode == EditMode::BrushEdit(BrushEditMode::Face),
-            EditToolButton::Clip => !draw_active && *edit_mode == EditMode::BrushEdit(BrushEditMode::Clip),
+            EditToolButton::Vertex => {
+                !draw_active && *edit_mode == EditMode::BrushEdit(BrushEditMode::Vertex)
+            }
+            EditToolButton::Edge => {
+                !draw_active && *edit_mode == EditMode::BrushEdit(BrushEditMode::Edge)
+            }
+            EditToolButton::Face => {
+                !draw_active && *edit_mode == EditMode::BrushEdit(BrushEditMode::Face)
+            }
+            EditToolButton::Clip => {
+                !draw_active && *edit_mode == EditMode::BrushEdit(BrushEditMode::Clip)
+            }
         };
         bg.0 = if active {
             tokens::SELECTED_BG
@@ -725,7 +747,10 @@ fn bottom_panels() -> impl Bundle {
             (
                 Spawn((split_panel::panel(1), asset_browser::asset_browser_panel())),
                 Spawn(split_panel::panel_handle()),
-                Spawn((split_panel::panel(1), texture_browser::texture_browser_panel())),
+                Spawn((
+                    split_panel::panel(1),
+                    texture_browser::texture_browser_panel(),
+                )),
             ),
         ),
     )

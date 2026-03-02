@@ -12,8 +12,7 @@ impl Plugin for ContextMenuPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (close_context_menu_on_click, close_context_menu_on_escape)
-                .in_set(ContextMenuCloseSet),
+            (close_context_menu_on_click, close_context_menu_on_escape).in_set(ContextMenuCloseSet),
         );
     }
 }

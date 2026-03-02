@@ -11,13 +11,13 @@ use super::materials::{
     AlphaSliderMaterial, CheckerboardMaterial, HsvRectMaterial, HueSliderMaterial,
 };
 use super::{
-    AlphaHandle, AlphaHandleMaterial, AlphaMaterialNode, AlphaSlider, ColorInputRow,
-    ColorPickerConfig, ColorPickerContent, ColorPickerPopover, ColorPickerState,
-    ColorPickerTrigger, EditorColorPicker, HsvRectHandle, HsvRectMaterialNode, HsvRectangle,
-    HueHandle, HueSlider, PreviewSwatchMaterial, TriggerLabel, TriggerSwatch,
-    TriggerSwatchConfig, TriggerSwatchMaterial, BORDER_RADIUS, CHECKERBOARD_SIZE, HANDLE_BORDER,
-    HANDLE_SIZE, HSV_RECT_HEIGHT, POPOVER_WIDTH, PREVIEW_CHECKERBOARD_SIZE, PREVIEW_SWATCH_SIZE,
-    SLIDER_HEIGHT, SWATCH_SIZE,
+    AlphaHandle, AlphaHandleMaterial, AlphaMaterialNode, AlphaSlider, BORDER_RADIUS,
+    CHECKERBOARD_SIZE, ColorInputRow, ColorPickerConfig, ColorPickerContent, ColorPickerPopover,
+    ColorPickerState, ColorPickerTrigger, EditorColorPicker, HANDLE_BORDER, HANDLE_SIZE,
+    HSV_RECT_HEIGHT, HsvRectHandle, HsvRectMaterialNode, HsvRectangle, HueHandle, HueSlider,
+    POPOVER_WIDTH, PREVIEW_CHECKERBOARD_SIZE, PREVIEW_SWATCH_SIZE, PreviewSwatchMaterial,
+    SLIDER_HEIGHT, SWATCH_SIZE, TriggerLabel, TriggerSwatch, TriggerSwatchConfig,
+    TriggerSwatchMaterial,
 };
 
 use crate::button::{ButtonClickEvent, ButtonProps, ButtonVariant, button};

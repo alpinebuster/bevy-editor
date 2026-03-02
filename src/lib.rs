@@ -14,10 +14,10 @@ pub mod layout;
 pub mod modal_transform;
 pub mod navmesh;
 pub mod scene_io;
-pub mod terrain;
 pub mod selection;
 pub mod snapping;
 pub mod status_bar;
+pub mod terrain;
 pub mod texture_browser;
 pub mod view_modes;
 pub mod viewport;
@@ -31,7 +31,6 @@ use bevy::{
     input_focus::InputDispatchPlugin,
     picking::hover::HoverMap,
     prelude::*,
-
 };
 use jackdaw_feathers::EditorFeathersPlugin;
 use jackdaw_widgets::menu_bar::MenuAction;
@@ -107,7 +106,12 @@ fn auto_hide_internal_entities(
     mut commands: Commands,
     new_entities: Query<
         (Entity, Option<&Name>, Option<&ChildOf>),
-        (Added<Transform>, Without<EditorEntity>, Without<EditorHidden>, Without<brush::BrushFaceEntity>),
+        (
+            Added<Transform>,
+            Without<EditorEntity>,
+            Without<EditorHidden>,
+            Without<brush::BrushFaceEntity>,
+        ),
     >,
     parent_query: Query<&ChildOf>,
     gltf_sources: Query<(), With<entity_ops::GltfSource>>,
@@ -135,10 +139,7 @@ fn auto_hide_internal_entities(
     }
 }
 
-fn spawn_layout(
-    mut commands: Commands,
-    icon_font: Res<jackdaw_feathers::icons::IconFont>,
-) {
+fn spawn_layout(mut commands: Commands, icon_font: Res<jackdaw_feathers::icons::IconFont>) {
     commands.spawn((Camera2d, EditorEntity));
     commands.spawn(layout::editor_layout(&icon_font));
 }
@@ -155,15 +156,18 @@ fn populate_menu(world: &mut World) {
         world,
         menu_bar_entity,
         vec![
-            ("File", vec![
-                ("file.new", "New"),
-                ("file.open", "Open"),
-                ("---", ""),
-                ("file.save", "Save"),
-                ("file.save_as", "Save As..."),
-                ("---", ""),
-                ("file.save_template", "Save Selection as Template"),
-            ]),
+            (
+                "File",
+                vec![
+                    ("file.new", "New"),
+                    ("file.open", "Open"),
+                    ("---", ""),
+                    ("file.save", "Save"),
+                    ("file.save_as", "Save As..."),
+                    ("---", ""),
+                    ("file.save_template", "Save Selection as Template"),
+                ],
+            ),
             (
                 "Edit",
                 vec![
@@ -270,15 +274,13 @@ fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
         }
         "view.bounding_boxes" => {
             commands.queue(|world: &mut World| {
-                let mut settings =
-                    world.resource_mut::<viewport_overlays::OverlaySettings>();
+                let mut settings = world.resource_mut::<viewport_overlays::OverlaySettings>();
                 settings.show_bounding_boxes = !settings.show_bounding_boxes;
             });
         }
         "view.bounding_box_mode" => {
             commands.queue(|world: &mut World| {
-                let mut settings =
-                    world.resource_mut::<viewport_overlays::OverlaySettings>();
+                let mut settings = world.resource_mut::<viewport_overlays::OverlaySettings>();
                 settings.bounding_box_mode = match settings.bounding_box_mode {
                     viewport_overlays::BoundingBoxMode::Aabb => {
                         viewport_overlays::BoundingBoxMode::ConvexHull
@@ -291,40 +293,29 @@ fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
         }
         "view.face_grid" => {
             commands.queue(|world: &mut World| {
-                let mut settings =
-                    world.resource_mut::<viewport_overlays::OverlaySettings>();
+                let mut settings = world.resource_mut::<viewport_overlays::OverlaySettings>();
                 settings.show_face_grid = !settings.show_face_grid;
             });
         }
         "view.alignment_guides" => {
             commands.queue(|world: &mut World| {
-                let mut settings =
-                    world.resource_mut::<viewport_overlays::OverlaySettings>();
+                let mut settings = world.resource_mut::<viewport_overlays::OverlaySettings>();
                 settings.show_alignment_guides = !settings.show_alignment_guides;
             });
         }
         "add.cube" => {
             commands.queue(|world: &mut World| {
-                entity_ops::create_entity_in_world(
-                    world,
-                    entity_ops::EntityTemplate::Cube,
-                );
+                entity_ops::create_entity_in_world(world, entity_ops::EntityTemplate::Cube);
             });
         }
         "add.sphere" => {
             commands.queue(|world: &mut World| {
-                entity_ops::create_entity_in_world(
-                    world,
-                    entity_ops::EntityTemplate::Sphere,
-                );
+                entity_ops::create_entity_in_world(world, entity_ops::EntityTemplate::Sphere);
             });
         }
         "add.point_light" => {
             commands.queue(|world: &mut World| {
-                entity_ops::create_entity_in_world(
-                    world,
-                    entity_ops::EntityTemplate::PointLight,
-                );
+                entity_ops::create_entity_in_world(world, entity_ops::EntityTemplate::PointLight);
             });
         }
         "add.directional_light" => {
@@ -337,26 +328,17 @@ fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
         }
         "add.spot_light" => {
             commands.queue(|world: &mut World| {
-                entity_ops::create_entity_in_world(
-                    world,
-                    entity_ops::EntityTemplate::SpotLight,
-                );
+                entity_ops::create_entity_in_world(world, entity_ops::EntityTemplate::SpotLight);
             });
         }
         "add.camera" => {
             commands.queue(|world: &mut World| {
-                entity_ops::create_entity_in_world(
-                    world,
-                    entity_ops::EntityTemplate::Camera3d,
-                );
+                entity_ops::create_entity_in_world(world, entity_ops::EntityTemplate::Camera3d);
             });
         }
         "add.empty" => {
             commands.queue(|world: &mut World| {
-                entity_ops::create_entity_in_world(
-                    world,
-                    entity_ops::EntityTemplate::Empty,
-                );
+                entity_ops::create_entity_in_world(world, entity_ops::EntityTemplate::Empty);
             });
         }
         "add.navmesh" => {

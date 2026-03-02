@@ -5,11 +5,12 @@ pub mod toolbar;
 mod visualization;
 
 use bevy::prelude::*;
-use bevy_rerecast::{prelude::*, rerecast::TriMesh, TriMeshFromBevyMesh as _};
+use bevy_rerecast::{TriMeshFromBevyMesh as _, prelude::*, rerecast::TriMesh};
 
 use crate::EditorEntity;
 
 pub use toolbar::NavmeshToolbar;
+pub use visualization::NavmeshVizConfig;
 
 pub struct NavmeshPlugin;
 

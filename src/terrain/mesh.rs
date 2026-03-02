@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use bevy::mesh::{Indices, PrimitiveTopology};
+use bevy::prelude::*;
 
 use super::{CHUNK_SIZE, TerrainChunk, TerrainDirtyChunks};
 use crate::EditorHidden;

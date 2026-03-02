@@ -17,7 +17,11 @@ impl Plugin for IconFontPlugin {
     }
 }
 
-fn load_fonts(mut commands: Commands, mut fonts: ResMut<Assets<Font>>, asset_server: Res<AssetServer>) {
+fn load_fonts(
+    mut commands: Commands,
+    mut fonts: ResMut<Assets<Font>>,
+    asset_server: Res<AssetServer>,
+) {
     // Load icon font from embedded bytes
     let icon_font = Font::try_from_bytes(lucide_icons::LUCIDE_FONT_BYTES.to_vec())
         .expect("Failed to load Lucide icon font");

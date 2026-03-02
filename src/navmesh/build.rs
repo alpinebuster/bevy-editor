@@ -29,7 +29,9 @@ fn on_build_navmesh(
 }
 
 /// Convert region settings without AABB (for BRP fetch — the remote app determines bounds).
-pub(super) fn region_to_settings_without_transform(region: &jackdaw_jsn::NavmeshRegion) -> NavmeshSettings {
+pub(super) fn region_to_settings_without_transform(
+    region: &jackdaw_jsn::NavmeshRegion,
+) -> NavmeshSettings {
     NavmeshSettings {
         agent_radius: region.agent_radius,
         agent_height: region.agent_height,
@@ -50,4 +52,3 @@ pub(super) fn region_to_settings_without_transform(region: &jackdaw_jsn::Navmesh
         ..default()
     }
 }
-

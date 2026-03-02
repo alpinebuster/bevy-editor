@@ -1,14 +1,11 @@
 use bevy::{
-    asset::{io::Reader, AssetLoader, LoadContext},
+    asset::{AssetLoader, LoadContext, io::Reader},
     ecs::{
         reflect::AppTypeRegistry,
         world::{FromWorld, World},
     },
     prelude::*,
-    reflect::{
-        serde::TypedReflectDeserializer,
-        TypeRegistryArc,
-    },
+    reflect::{TypeRegistryArc, serde::TypedReflectDeserializer},
     scene::DynamicScene,
 };
 use serde::de::DeserializeSeed;
@@ -47,11 +44,10 @@ impl AssetLoader for JsnAssetLoader {
             .await
             .map_err(|e| JsnLoadError::Io(e.to_string()))?;
 
-        let text = std::str::from_utf8(&bytes)
-            .map_err(|e| JsnLoadError::Parse(e.to_string()))?;
+        let text = std::str::from_utf8(&bytes).map_err(|e| JsnLoadError::Parse(e.to_string()))?;
 
-        let jsn: JsnScene = serde_json::from_str(text)
-            .map_err(|e| JsnLoadError::Parse(e.to_string()))?;
+        let jsn: JsnScene =
+            serde_json::from_str(text).map_err(|e| JsnLoadError::Parse(e.to_string()))?;
 
         // Build a DynamicScene by spawning into a temporary world
         let scene = build_dynamic_scene(&jsn.scene, &self.type_registry)

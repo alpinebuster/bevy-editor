@@ -5,7 +5,7 @@ use bevy::window::PrimaryWindow;
 use lucide_icons::Icon;
 
 use crate::button::{
-    icon_button, set_button_variant, ButtonClickEvent, ButtonVariant, IconButtonProps,
+    ButtonClickEvent, ButtonVariant, IconButtonProps, icon_button, set_button_variant,
 };
 use crate::tokens::{
     BACKGROUND_COLOR, BORDER_COLOR, CORNER_RADIUS_LG, TEXT_DISPLAY_COLOR, TEXT_SIZE,
@@ -325,9 +325,7 @@ fn handle_popover_dismiss(
         // Don't dismiss on click if the anchor (trigger) is hovered —
         // let the anchor's click handler manage open/close toggling.
         if clicked && !esc_pressed {
-            let anchor_is_hovered = anchor_hovered
-                .get(anchor.0)
-                .is_ok_and(|h| h.get());
+            let anchor_is_hovered = anchor_hovered.get(anchor.0).is_ok_and(|h| h.get());
             if anchor_is_hovered {
                 continue;
             }
@@ -342,14 +340,11 @@ fn handle_popover_dismiss(
             continue;
         }
 
-        let has_hovered_nested_popover =
-            popovers
-                .iter()
-                .any(|(other_entity, _, other_hovered)| {
-                    other_entity != entity
-                        && other_hovered.get()
-                        && is_nested_in_popover(other_entity, entity, &popovers, &parents)
-                });
+        let has_hovered_nested_popover = popovers.iter().any(|(other_entity, _, other_hovered)| {
+            other_entity != entity
+                && other_hovered.get()
+                && is_nested_in_popover(other_entity, entity, &popovers, &parents)
+        });
 
         if !has_hovered_nested_popover {
             commands.entity(entity).try_despawn();

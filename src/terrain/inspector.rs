@@ -1,16 +1,18 @@
-use bevy::{prelude::*, ui_widgets::observe};
+use bevy::input_focus::InputFocus;
+use bevy::prelude::*;
+use bevy::ui_widgets::observe;
 use jackdaw_feathers::{
     button::{self, ButtonProps, ButtonVariant},
     combobox::{self, ComboBoxChangeEvent},
-    numeric_input,
+    text_edit::{
+        self, TextEditCommitEvent, TextEditDragging, TextEditProps, TextEditVariant,
+        TextEditWrapper, TextInputBuffer, TextInputQueue, format_numeric_value,
+        set_text_input_value,
+    },
     tokens,
 };
-use jackdaw_widgets::numeric_input::{NumericInput, NumericValueChanged};
 
-use super::{
-    TerrainBrushSettings, TerrainDirtyChunks, TerrainEditMode,
-    sculpt::SetTerrainHeights,
-};
+use super::{TerrainBrushSettings, TerrainDirtyChunks, TerrainEditMode, sculpt::SetTerrainHeights};
 use crate::commands::CommandHistory;
 use crate::selection::Selection;
 
@@ -18,7 +20,8 @@ pub(super) fn plugin(app: &mut App) {
     app.init_resource::<TerrainGenerateState>()
         .add_systems(Update, (update_terrain_inspector, sync_brush_fields))
         .add_observer(on_generate_clicked)
-        .add_observer(on_erode_clicked);
+        .add_observer(on_erode_clicked)
+        .add_observer(on_terrain_text_commit);
 }
 
 // --- Events ---
@@ -106,9 +109,7 @@ fn update_terrain_inspector(
     icon_font: Res<jackdaw_feathers::icons::IconFont>,
 ) {
     // Determine if we should show terrain inspector
-    let terrain_entity = selection
-        .primary()
-        .filter(|&e| terrains.contains(e));
+    let terrain_entity = selection.primary().filter(|&e| terrains.contains(e));
 
     let is_sculpt = matches!(*edit_mode, TerrainEditMode::Sculpt(_));
 
@@ -286,9 +287,7 @@ fn update_terrain_inspector(
 
     // Generate button
     commands.spawn((
-        button::button(
-            ButtonProps::new("Generate").with_variant(ButtonVariant::Primary),
-        ),
+        button::button(ButtonProps::new("Generate").with_variant(ButtonVariant::Primary)),
         ChildOf(body),
         observe(|_: On<Pointer<Click>>, mut commands: Commands| {
             commands.trigger(GenerateClicked);
@@ -362,9 +361,7 @@ fn update_terrain_inspector(
 
     // Erode button
     commands.spawn((
-        button::button(
-            ButtonProps::new("Erode").with_variant(ButtonVariant::Primary),
-        ),
+        button::button(ButtonProps::new("Erode").with_variant(ButtonVariant::Primary)),
         ChildOf(ebody),
         observe(|_: On<Pointer<Click>>, mut commands: Commands| {
             commands.trigger(ErodeClicked);
@@ -372,22 +369,71 @@ fn update_terrain_inspector(
     ));
 }
 
-/// Sync brush resource values into existing NumericInput widgets without rebuilding the UI.
+/// Sync brush resource values into existing text_edit widgets without rebuilding the UI.
 fn sync_brush_fields(
     brush_settings: Res<TerrainBrushSettings>,
-    mut inputs: Query<(&BrushField, &mut NumericInput)>,
+    input_focus: Res<InputFocus>,
+    outer_query: Query<(Entity, &BrushField, &Children)>,
+    wrapper_query: Query<&TextEditWrapper>,
+    dragging_query: Query<(), With<TextEditDragging>>,
+    children_query: Query<&Children>,
+    mut queue_query: Query<(&TextInputBuffer, &mut TextInputQueue)>,
 ) {
     if !brush_settings.is_changed() {
         return;
     }
-    for (field, mut input) in &mut inputs {
+    for (_outer, field, children) in &outer_query {
         let new_val = match field {
             BrushField::Radius => brush_settings.radius as f64,
             BrushField::Strength => brush_settings.strength as f64,
             BrushField::Falloff => brush_settings.falloff as f64,
         };
-        if input.value != new_val {
-            input.value = new_val;
+        let formatted = format_numeric_value(new_val, TextEditVariant::NumericF32);
+
+        // Find inner entity: outer → wrapper child → TextEditWrapper → inner entity
+        let mut found = false;
+        for child in children.iter() {
+            if let Ok(wrapper) = wrapper_query.get(child) {
+                if dragging_query.get(child).is_ok() || input_focus.0 == Some(wrapper.0) {
+                    found = true;
+                    break;
+                }
+                if let Ok((buffer, mut queue)) = queue_query.get_mut(wrapper.0) {
+                    let current: String = buffer.get_text();
+                    if current != formatted {
+                        set_text_input_value(&mut queue, formatted.clone());
+                    }
+                }
+                found = true;
+                break;
+            }
+        }
+        if found {
+            continue;
+        }
+        // One more level: wrapper child may be nested
+        for child in children.iter() {
+            if let Ok(grandchildren) = children_query.get(child) {
+                for gc in grandchildren.iter() {
+                    if let Ok(wrapper) = wrapper_query.get(gc) {
+                        if dragging_query.get(gc).is_ok() || input_focus.0 == Some(wrapper.0) {
+                            found = true;
+                            break;
+                        }
+                        if let Ok((buffer, mut queue)) = queue_query.get_mut(wrapper.0) {
+                            let current: String = buffer.get_text();
+                            if current != formatted {
+                                set_text_input_value(&mut queue, formatted.clone());
+                            }
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+                if found {
+                    break;
+                }
+            }
         }
     }
 }
@@ -424,7 +470,6 @@ fn spawn_labeled_field(
         ChildOf(row),
     ));
 
-    // Tooltip as description line
     commands.spawn((
         Text::new(tooltip),
         TextFont {
@@ -435,22 +480,15 @@ fn spawn_labeled_field(
         ChildOf(row),
     ));
 
-    commands
-        .spawn((
-            numeric_input::numeric_input(value),
-            field,
-            ChildOf(row),
-        ))
-        .observe(
-            move |changed: On<NumericValueChanged>,
-                  mut brush_settings: ResMut<TerrainBrushSettings>| {
-                match field {
-                    BrushField::Radius => brush_settings.radius = changed.value as f32,
-                    BrushField::Strength => brush_settings.strength = changed.value as f32,
-                    BrushField::Falloff => brush_settings.falloff = changed.value as f32,
-                }
-            },
-        );
+    commands.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .numeric_f32()
+                .with_default_value(value.to_string()),
+        ),
+        field,
+        ChildOf(row),
+    ));
 }
 
 fn spawn_gen_field(
@@ -493,26 +531,15 @@ fn spawn_gen_field(
         ChildOf(row),
     ));
 
-    commands
-        .spawn((
-            numeric_input::numeric_input(value),
-            field,
-            ChildOf(row),
-        ))
-        .observe(
-            move |changed: On<NumericValueChanged>,
-                  mut gen_state: ResMut<TerrainGenerateState>| {
-                match field {
-                    GenField::Seed => gen_state.settings.seed = changed.value as u32,
-                    GenField::Frequency => gen_state.settings.frequency = changed.value,
-                    GenField::Octaves => gen_state.settings.octaves = changed.value as usize,
-                    GenField::Lacunarity => gen_state.settings.lacunarity = changed.value,
-                    GenField::Persistence => gen_state.settings.persistence = changed.value,
-                    GenField::Amplitude => gen_state.settings.amplitude = changed.value as f32,
-                    GenField::Offset => gen_state.settings.offset = changed.value as f32,
-                }
-            },
-        );
+    commands.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .numeric_f32()
+                .with_default_value(value.to_string()),
+        ),
+        field,
+        ChildOf(row),
+    ));
 }
 
 fn spawn_erosion_field(
@@ -555,26 +582,71 @@ fn spawn_erosion_field(
         ChildOf(row),
     ));
 
-    commands
-        .spawn((
-            numeric_input::numeric_input(value),
-            field,
-            ChildOf(row),
-        ))
-        .observe(
-            move |changed: On<NumericValueChanged>,
-                  mut gen_state: ResMut<TerrainGenerateState>| {
-                match field {
-                    ErosionField::Iterations => gen_state.erosion.iterations = changed.value as u32,
-                    ErosionField::ErosionRadius => gen_state.erosion.erosion_radius = changed.value as u32,
-                    ErosionField::Inertia => gen_state.erosion.inertia = changed.value as f32,
-                    ErosionField::Capacity => gen_state.erosion.capacity = changed.value as f32,
-                    ErosionField::Deposition => gen_state.erosion.deposition = changed.value as f32,
-                    ErosionField::Erosion => gen_state.erosion.erosion = changed.value as f32,
-                    ErosionField::Evaporation => gen_state.erosion.evaporation = changed.value as f32,
-                }
-            },
-        );
+    commands.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .numeric_f32()
+                .with_default_value(value.to_string()),
+        ),
+        field,
+        ChildOf(row),
+    ));
+}
+
+/// Handle TextEditCommitEvent for terrain inspector fields (brush, gen, erosion).
+fn on_terrain_text_commit(
+    event: On<TextEditCommitEvent>,
+    brush_bindings: Query<&BrushField>,
+    gen_bindings: Query<&GenField>,
+    erosion_bindings: Query<&ErosionField>,
+    child_of_query: Query<&ChildOf>,
+    mut brush_settings: ResMut<TerrainBrushSettings>,
+    mut gen_state: ResMut<TerrainGenerateState>,
+) {
+    let value: f64 = event.text.parse().unwrap_or(0.0);
+
+    // Walk up from committed entity to find a field binding
+    let mut current = event.entity;
+    for _ in 0..4 {
+        let Ok(child_of) = child_of_query.get(current) else {
+            break;
+        };
+        let parent = child_of.parent();
+
+        if let Ok(&field) = brush_bindings.get(parent) {
+            match field {
+                BrushField::Radius => brush_settings.radius = value as f32,
+                BrushField::Strength => brush_settings.strength = value as f32,
+                BrushField::Falloff => brush_settings.falloff = value as f32,
+            }
+            return;
+        }
+        if let Ok(&field) = gen_bindings.get(parent) {
+            match field {
+                GenField::Seed => gen_state.settings.seed = value as u32,
+                GenField::Frequency => gen_state.settings.frequency = value,
+                GenField::Octaves => gen_state.settings.octaves = value as usize,
+                GenField::Lacunarity => gen_state.settings.lacunarity = value,
+                GenField::Persistence => gen_state.settings.persistence = value,
+                GenField::Amplitude => gen_state.settings.amplitude = value as f32,
+                GenField::Offset => gen_state.settings.offset = value as f32,
+            }
+            return;
+        }
+        if let Ok(&field) = erosion_bindings.get(parent) {
+            match field {
+                ErosionField::Iterations => gen_state.erosion.iterations = value as u32,
+                ErosionField::ErosionRadius => gen_state.erosion.erosion_radius = value as u32,
+                ErosionField::Inertia => gen_state.erosion.inertia = value as f32,
+                ErosionField::Capacity => gen_state.erosion.capacity = value as f32,
+                ErosionField::Deposition => gen_state.erosion.deposition = value as f32,
+                ErosionField::Erosion => gen_state.erosion.erosion = value as f32,
+                ErosionField::Evaporation => gen_state.erosion.evaporation = value as f32,
+            }
+            return;
+        }
+        current = parent;
+    }
 }
 
 // --- Event handlers ---
@@ -595,8 +667,7 @@ fn on_generate_clicked(
 
     let old_heights = terrain.heights.clone();
 
-    let new_heights =
-        jackdaw_terrain::generate_heightmap(terrain.resolution, &gen_state.settings);
+    let new_heights = jackdaw_terrain::generate_heightmap(terrain.resolution, &gen_state.settings);
     terrain.heights = new_heights.clone();
     dirty.rebuild_all = true;
 

@@ -39,7 +39,11 @@ fn average_neighbors(heightmap: &Heightmap, x: u32, z: u32) -> f32 {
         }
     }
 
-    if count > 0.0 { sum / count } else { heightmap.get_height(x, z) }
+    if count > 0.0 {
+        sum / count
+    } else {
+        heightmap.get_height(x, z)
+    }
 }
 
 /// Apply a brush stroke to the heightmap.
@@ -151,9 +155,13 @@ pub fn affected_chunks(
     let (cx_count, cz_count) = heightmap.chunk_count(chunk_size);
 
     let min_gx = (center.x - radius).floor().max(0.0) as u32;
-    let max_gx = (center.x + radius).ceil().min(heightmap.resolution as f32 - 1.0) as u32;
+    let max_gx = (center.x + radius)
+        .ceil()
+        .min(heightmap.resolution as f32 - 1.0) as u32;
     let min_gz = (center.y - radius).floor().max(0.0) as u32;
-    let max_gz = (center.y + radius).ceil().min(heightmap.resolution as f32 - 1.0) as u32;
+    let max_gz = (center.y + radius)
+        .ceil()
+        .min(heightmap.resolution as f32 - 1.0) as u32;
 
     let min_cx = min_gx / chunk_size;
     let max_cx = (max_gx / chunk_size).min(cx_count - 1);

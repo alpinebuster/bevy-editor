@@ -1,23 +1,37 @@
 use bevy::{prelude::*, ui_widgets::observe};
 use jackdaw_feathers::{
     button::{self, ButtonProps, ButtonVariant},
-    tokens,
+    separator, tokens,
 };
 
 use super::{
     brp_client::GetNavmeshInput,
     build::BuildNavmesh,
     save_load::{LoadNavmesh, SaveNavmesh},
+    visualization::NavmeshVizConfig,
 };
 use crate::{EditorEntity, selection::Selection};
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Update, toggle_toolbar_visibility);
+    app.add_systems(
+        Update,
+        (toggle_toolbar_visibility, update_navmesh_viz_highlights),
+    );
+    app.add_observer(on_viz_toggle_added);
 }
 
 /// Marker for the navmesh contextual toolbar node.
 #[derive(Component)]
 pub struct NavmeshToolbar;
+
+/// Marker for navmesh visualization toggle buttons.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+enum NavmeshVizToggle {
+    Visual,
+    Obstacles,
+    DetailMesh,
+    PolygonMesh,
+}
 
 /// Builds the navmesh toolbar UI node. Starts hidden (`Display::None`).
 pub fn navmesh_toolbar() -> impl Bundle {
@@ -71,7 +85,35 @@ pub fn navmesh_toolbar() -> impl Bundle {
                     commands.trigger(LoadNavmesh);
                 }),
             ),
+            // Separator before viz toggles
+            separator::separator(separator::SeparatorProps::vertical()),
+            // Visualization toggle buttons
+            viz_toggle_button("Visual", NavmeshVizToggle::Visual, true),
+            viz_toggle_button("Obstacles", NavmeshVizToggle::Obstacles, false),
+            viz_toggle_button("Detail", NavmeshVizToggle::DetailMesh, true),
+            viz_toggle_button("Poly", NavmeshVizToggle::PolygonMesh, false),
         ],
+    )
+}
+
+fn viz_toggle_button(
+    label: &str,
+    toggle: NavmeshVizToggle,
+    _initially_active: bool,
+) -> impl Bundle {
+    (
+        toggle,
+        button::button(ButtonProps::new(label).with_variant(ButtonVariant::Default)),
+        observe(
+            move |_: On<Pointer<Click>>, mut config: ResMut<NavmeshVizConfig>| match toggle {
+                NavmeshVizToggle::Visual => config.show_visual = !config.show_visual,
+                NavmeshVizToggle::Obstacles => config.show_obstacles = !config.show_obstacles,
+                NavmeshVizToggle::DetailMesh => config.show_detail_mesh = !config.show_detail_mesh,
+                NavmeshVizToggle::PolygonMesh => {
+                    config.show_polygon_mesh = !config.show_polygon_mesh
+                }
+            },
+        ),
     )
 }
 
@@ -84,9 +126,7 @@ fn toggle_toolbar_visibility(
         return;
     }
 
-    let should_show = selection
-        .primary()
-        .is_some_and(|e| regions.contains(e));
+    let should_show = selection.primary().is_some_and(|e| regions.contains(e));
 
     for mut node in &mut toolbar {
         node.display = if should_show {
@@ -94,5 +134,42 @@ fn toggle_toolbar_visibility(
         } else {
             Display::None
         };
+    }
+}
+
+fn update_navmesh_viz_highlights(
+    viz_config: Res<NavmeshVizConfig>,
+    mut buttons: Query<(&NavmeshVizToggle, &mut BackgroundColor)>,
+) {
+    if !viz_config.is_changed() {
+        return;
+    }
+
+    for (toggle, mut bg) in &mut buttons {
+        bg.0 = viz_toggle_bg(&viz_config, toggle);
+    }
+}
+
+fn on_viz_toggle_added(
+    trigger: On<Add, NavmeshVizToggle>,
+    viz_config: Res<NavmeshVizConfig>,
+    mut buttons: Query<(&NavmeshVizToggle, &mut BackgroundColor)>,
+) {
+    if let Ok((toggle, mut bg)) = buttons.get_mut(trigger.event_target()) {
+        bg.0 = viz_toggle_bg(&viz_config, toggle);
+    }
+}
+
+fn viz_toggle_bg(config: &NavmeshVizConfig, toggle: &NavmeshVizToggle) -> Color {
+    let active = match toggle {
+        NavmeshVizToggle::Visual => config.show_visual,
+        NavmeshVizToggle::Obstacles => config.show_obstacles,
+        NavmeshVizToggle::DetailMesh => config.show_detail_mesh,
+        NavmeshVizToggle::PolygonMesh => config.show_polygon_mesh,
+    };
+    if active {
+        tokens::SELECTED_BG
+    } else {
+        tokens::TOOLBAR_BUTTON_BG
     }
 }

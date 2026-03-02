@@ -299,11 +299,8 @@ fn build_scene_snapshot(world: &mut World) -> Vec<JsnEntity> {
     let entities: Vec<Entity> = scene_set.into_iter().collect();
 
     // Build entity → index map for parent references
-    let index_map: HashMap<Entity, usize> = entities
-        .iter()
-        .enumerate()
-        .map(|(i, &e)| (e, i))
-        .collect();
+    let index_map: HashMap<Entity, usize> =
+        entities.iter().enumerate().map(|(i, &e)| (e, i)).collect();
 
     let registry = world.resource::<AppTypeRegistry>().clone();
     let registry = registry.read();
@@ -585,7 +582,7 @@ fn days_to_date(days: u64) -> (u64, u64, u64) {
 }
 
 fn is_leap(y: u64) -> bool {
-    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+    (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400)
 }
 
 fn poll_scene_dialog(world: &mut World) {

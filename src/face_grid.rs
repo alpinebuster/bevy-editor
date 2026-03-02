@@ -11,8 +11,7 @@ impl Plugin for FaceGridPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
-            draw_face_grids
-                .after(bevy::transform::TransformSystems::Propagate),
+            draw_face_grids.after(bevy::transform::TransformSystems::Propagate),
         );
     }
 }
@@ -98,15 +97,9 @@ fn draw_face_grids(
             // Draw lines at constant U values (vertical lines in 2D)
             let mut u = grid_min_u;
             while u <= grid_max_u + grid_size * 0.01 {
-                if let Some((p0_2d, p1_2d)) =
-                    clip_line_to_convex_polygon(&polygon_2d, true, u)
-                {
-                    let a = reconstruct_3d(
-                        p0_2d, axis_u, axis_v, plane_axis, plane_d, normal_arr,
-                    );
-                    let b = reconstruct_3d(
-                        p1_2d, axis_u, axis_v, plane_axis, plane_d, normal_arr,
-                    );
+                if let Some((p0_2d, p1_2d)) = clip_line_to_convex_polygon(&polygon_2d, true, u) {
+                    let a = reconstruct_3d(p0_2d, axis_u, axis_v, plane_axis, plane_d, normal_arr);
+                    let b = reconstruct_3d(p1_2d, axis_u, axis_v, plane_axis, plane_d, normal_arr);
                     if let (Some(a), Some(b)) = (a, b) {
                         let offset = world_normal * 0.002;
                         gizmos.line(a + offset, b + offset, color);
@@ -118,15 +111,9 @@ fn draw_face_grids(
             // Draw lines at constant V values (horizontal lines in 2D)
             let mut v = grid_min_v;
             while v <= grid_max_v + grid_size * 0.01 {
-                if let Some((p0_2d, p1_2d)) =
-                    clip_line_to_convex_polygon(&polygon_2d, false, v)
-                {
-                    let a = reconstruct_3d(
-                        p0_2d, axis_u, axis_v, plane_axis, plane_d, normal_arr,
-                    );
-                    let b = reconstruct_3d(
-                        p1_2d, axis_u, axis_v, plane_axis, plane_d, normal_arr,
-                    );
+                if let Some((p0_2d, p1_2d)) = clip_line_to_convex_polygon(&polygon_2d, false, v) {
+                    let a = reconstruct_3d(p0_2d, axis_u, axis_v, plane_axis, plane_d, normal_arr);
+                    let b = reconstruct_3d(p1_2d, axis_u, axis_v, plane_axis, plane_d, normal_arr);
                     if let (Some(a), Some(b)) = (a, b) {
                         let offset = world_normal * 0.002;
                         gizmos.line(a + offset, b + offset, color);
@@ -155,8 +142,8 @@ fn reconstruct_3d(
     arr[axis_u] = point_2d.x;
     arr[axis_v] = point_2d.y;
     // Solve: normal[plane_axis] * arr[plane_axis] = plane_d - normal[axis_u]*arr[axis_u] - normal[axis_v]*arr[axis_v]
-    arr[plane_axis] =
-        (plane_d - normal[axis_u] * arr[axis_u] - normal[axis_v] * arr[axis_v]) / normal[plane_axis];
+    arr[plane_axis] = (plane_d - normal[axis_u] * arr[axis_u] - normal[axis_v] * arr[axis_v])
+        / normal[plane_axis];
     Some(Vec3::from_array(arr))
 }
 
@@ -207,14 +194,8 @@ fn clip_line_to_convex_polygon(
         return None;
     }
 
-    let min_other = intersections
-        .iter()
-        .copied()
-        .fold(f32::MAX, f32::min);
-    let max_other = intersections
-        .iter()
-        .copied()
-        .fold(f32::MIN, f32::max);
+    let min_other = intersections.iter().copied().fold(f32::MAX, f32::min);
+    let max_other = intersections.iter().copied().fold(f32::MIN, f32::max);
 
     if (max_other - min_other).abs() < 1e-6 {
         return None;

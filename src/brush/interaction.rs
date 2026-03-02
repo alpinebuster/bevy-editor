@@ -1,28 +1,22 @@
 use std::collections::HashSet;
 
-use bevy::{
-    input_focus::InputFocus,
-    prelude::*,
-};
+use bevy::{input_focus::InputFocus, prelude::*};
 
 use crate::{
+    EditorEntity,
     commands::{CommandHistory, snapshot_entity},
     draw_brush::CreateBrushCommand,
     selection::{Selected, Selection},
     viewport::SceneViewport,
     viewport_util::{point_in_polygon_2d, point_to_segment_dist, window_to_viewport_cursor},
-    EditorEntity,
 };
 
 const MIN_EXTRUDE_DEPTH: f32 = 0.01;
 
-use jackdaw_jsn::{Brush, BrushFaceData, BrushPlane};
-use jackdaw_geometry::{compute_face_tangent_axes, point_inside_all_planes, EPSILON};
-use super::{
-    BrushEditMode, BrushMeshCache, BrushSelection, EditMode,
-    SetBrush,
-};
 use super::hull::rebuild_brush_from_vertices;
+use super::{BrushEditMode, BrushMeshCache, BrushSelection, EditMode, SetBrush};
+use jackdaw_geometry::{EPSILON, compute_face_tangent_axes, point_inside_all_planes};
+use jackdaw_jsn::{Brush, BrushFaceData, BrushPlane};
 
 pub(super) fn handle_edit_mode_keys(
     input_focus: Res<InputFocus>,
@@ -184,7 +178,8 @@ pub(super) fn brush_face_interact(
     let Ok((camera, cam_tf)) = camera_query.single() else {
         return;
     };
-    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query) else {
+    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
+    else {
         return;
     };
 
@@ -279,14 +274,18 @@ pub(super) fn brush_face_interact(
                             }
                             FaceExtrudeMode::Extend => {
                                 // Capture world-space face polygon vertices for preview
-                                let (_, brush_rot, _) = brush_global.to_scale_rotation_translation();
-                                drag_state.extend_face_normal = (brush_rot * drag_state.drag_face_normal).normalize();
+                                let (_, brush_rot, _) =
+                                    brush_global.to_scale_rotation_translation();
+                                drag_state.extend_face_normal =
+                                    (brush_rot * drag_state.drag_face_normal).normalize();
                                 if let Ok(cache) = brush_caches.get(brush_entity) {
                                     if let Some(&face_idx) = brush_selection.faces.first() {
                                         let polygon = &cache.face_polygons[face_idx];
                                         drag_state.extend_face_polygon = polygon
                                             .iter()
-                                            .map(|&vi| brush_global.transform_point(cache.vertices[vi]))
+                                            .map(|&vi| {
+                                                brush_global.transform_point(cache.vertices[vi])
+                                            })
                                             .collect();
                                     }
                                 }
@@ -322,7 +321,9 @@ pub(super) fn brush_face_interact(
                 let Ok(origin_screen) = camera.world_to_viewport(cam_tf, brush_pos) else {
                     return;
                 };
-                let Ok(normal_screen) = camera.world_to_viewport(cam_tf, brush_pos + drag_state.drag_face_normal) else {
+                let Ok(normal_screen) =
+                    camera.world_to_viewport(cam_tf, brush_pos + drag_state.drag_face_normal)
+                else {
                     return;
                 };
                 let screen_dir = (normal_screen - origin_screen).normalize_or_zero();
@@ -334,7 +335,8 @@ pub(super) fn brush_face_interact(
 
                 for &face_idx in &brush_selection.faces {
                     if face_idx < start.faces.len() && face_idx < brush.faces.len() {
-                        brush.faces[face_idx].plane.distance = start.faces[face_idx].plane.distance + drag_amount;
+                        brush.faces[face_idx].plane.distance =
+                            start.faces[face_idx].plane.distance + drag_amount;
                     }
                 }
             }
@@ -352,7 +354,9 @@ pub(super) fn brush_face_interact(
                 let Ok(origin_screen) = camera.world_to_viewport(cam_tf, face_centroid) else {
                     return;
                 };
-                let Ok(normal_screen) = camera.world_to_viewport(cam_tf, face_centroid + world_normal) else {
+                let Ok(normal_screen) =
+                    camera.world_to_viewport(cam_tf, face_centroid + world_normal)
+                else {
                     return;
                 };
                 let screen_dir = (normal_screen - origin_screen).normalize_or_zero();
@@ -417,8 +421,8 @@ pub(super) fn brush_face_interact(
 
         if point_in_polygon_2d(viewport_cursor, &screen_verts) {
             // Use depth of centroid to resolve overlapping faces
-            let centroid: Vec3 = polygon.iter().map(|&vi| cache.vertices[vi]).sum::<Vec3>()
-                / polygon.len() as f32;
+            let centroid: Vec3 =
+                polygon.iter().map(|&vi| cache.vertices[vi]).sum::<Vec3>() / polygon.len() as f32;
             let world_centroid = brush_tf.transform_point(centroid);
             let depth = (cam_tf.translation() - world_centroid).length_squared();
             if depth < best_depth {
@@ -467,7 +471,9 @@ pub(super) fn brush_face_interact(
                 };
             }
             // Record pending drag
-            drag_state.pending = Some(PendingSubDrag { click_pos: cursor_pos });
+            drag_state.pending = Some(PendingSubDrag {
+                click_pos: cursor_pos,
+            });
         }
     } else if in_face_edit && !ctrl {
         // Click away from any face: clear selection
@@ -598,7 +604,8 @@ pub(super) fn brush_vertex_interact(
     let Ok((camera, cam_tf)) = camera_query.single() else {
         return;
     };
-    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query) else {
+    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
+    else {
         return;
     };
 
@@ -820,7 +827,9 @@ pub(super) fn brush_vertex_interact(
             let new_idx = cache.vertices.len();
             brush_selection.vertices = vec![new_idx];
             drag_state.split_vertex = Some(split_pos);
-            drag_state.pending = Some(PendingSubDrag { click_pos: cursor_pos });
+            drag_state.pending = Some(PendingSubDrag {
+                click_pos: cursor_pos,
+            });
         }
         return;
     }
@@ -851,7 +860,9 @@ pub(super) fn brush_vertex_interact(
         } else {
             brush_selection.vertices = vec![vi];
             // Record pending drag
-            drag_state.pending = Some(PendingSubDrag { click_pos: cursor_pos });
+            drag_state.pending = Some(PendingSubDrag {
+                click_pos: cursor_pos,
+            });
         }
     } else if !ctrl {
         brush_selection.vertices.clear();
@@ -891,7 +902,8 @@ pub(super) fn brush_edge_interact(
     let Ok((camera, cam_tf)) = camera_query.single() else {
         return;
     };
-    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query) else {
+    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
+    else {
         return;
     };
 
@@ -1094,7 +1106,9 @@ pub(super) fn brush_edge_interact(
         } else {
             brush_selection.edges = vec![edge];
             // Record pending drag
-            drag_state.pending = Some(PendingSubDrag { click_pos: cursor_pos });
+            drag_state.pending = Some(PendingSubDrag {
+                click_pos: cursor_pos,
+            });
         }
     } else if !ctrl {
         brush_selection.edges.clear();
@@ -1108,8 +1122,8 @@ pub(crate) struct PendingSubDrag {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub(crate) enum FaceExtrudeMode {
     #[default]
-    Merge,   // Push/pull existing face plane
-    Extend,  // Create new brush from face extrusion
+    Merge, // Push/pull existing face plane
+    Extend, // Create new brush from face extrusion
 }
 
 #[derive(Resource, Default)]
@@ -1263,12 +1277,9 @@ pub(super) fn handle_brush_delete(
                 return; // need at least a tetrahedron
             }
             let old = brush.clone();
-            if let Some(new_brush) = rebuild_brush_from_vertices(
-                &old,
-                &cache.vertices,
-                &cache.face_polygons,
-                &remaining,
-            ) {
+            if let Some(new_brush) =
+                rebuild_brush_from_vertices(&old, &cache.vertices, &cache.face_polygons, &remaining)
+            {
                 *brush = new_brush;
                 let cmd = SetBrush {
                     entity: brush_entity,
@@ -1304,12 +1315,9 @@ pub(super) fn handle_brush_delete(
                 return;
             }
             let old = brush.clone();
-            if let Some(new_brush) = rebuild_brush_from_vertices(
-                &old,
-                &cache.vertices,
-                &cache.face_polygons,
-                &remaining,
-            ) {
+            if let Some(new_brush) =
+                rebuild_brush_from_vertices(&old, &cache.vertices, &cache.face_polygons, &remaining)
+            {
                 *brush = new_brush;
                 let cmd = SetBrush {
                     entity: brush_entity,
@@ -1414,7 +1422,8 @@ pub(super) fn handle_clip_mode(
         let Some(cursor_pos) = window.cursor_position() else {
             return;
         };
-        let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query) else {
+        let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
+        else {
             return;
         };
 
@@ -1453,8 +1462,7 @@ pub(super) fn handle_clip_mode(
             if t > 0.0 && t < best_t {
                 let hit = ray.origin + *ray.direction * t;
                 // Verify hit is roughly on the brush (within face polygon bounds)
-                let local_hit =
-                    brush_rot.inverse() * (hit - brush_trans);
+                let local_hit = brush_rot.inverse() * (hit - brush_trans);
                 if point_inside_all_planes(local_hit, &brush_ref.faces) {
                     best_t = t;
                     best_point = Some(local_hit);
@@ -1552,6 +1560,10 @@ pub(super) fn handle_clip_mode(
         gizmos.line(center - world_u, center - world_v, preview_color);
         gizmos.line(center - world_v, center + world_u, preview_color);
         // Draw normal arrow
-        gizmos.arrow(center, center + world_normal * 0.5, Color::srgb(1.0, 0.3, 0.3));
+        gizmos.arrow(
+            center,
+            center + world_normal * 0.5,
+            Color::srgb(1.0, 0.3, 0.3),
+        );
     }
 }

@@ -1,14 +1,15 @@
 use crate::EditorEntity;
 use crate::brush::{
-    Brush, BrushEditMode, BrushFaceData, BrushSelection, EditMode, SetBrush,
-    TextureMaterialCache,
+    Brush, BrushEditMode, BrushFaceData, BrushSelection, EditMode, SetBrush, TextureMaterialCache,
 };
 use crate::commands::CommandHistory;
 use crate::texture_browser::ClearTextureFromFaces;
 
 use bevy::prelude::*;
-use jackdaw_feathers::{numeric_input, tokens};
-use jackdaw_widgets::numeric_input::NumericValueChanged;
+use jackdaw_feathers::{
+    text_edit::{self, TextEditCommitEvent, TextEditProps},
+    tokens,
+};
 
 use super::{BrushFaceField, BrushFaceFieldBinding, BrushFacePropsContainer};
 
@@ -246,11 +247,11 @@ pub(crate) fn update_brush_face_properties(
             TextColor(tokens::TEXT_PRIMARY),
             ChildOf(btn),
         ));
-        commands.entity(btn).observe(
-            |_: On<Pointer<Click>>, mut commands: Commands| {
+        commands
+            .entity(btn)
+            .observe(|_: On<Pointer<Click>>, mut commands: Commands| {
                 commands.trigger(ClearTextureFromFaces);
-            },
-        );
+            });
         commands.entity(btn).observe(
             |hover: On<Pointer<Over>>, mut bg: Query<&mut BackgroundColor>| {
                 if let Ok(mut bg) = bg.get_mut(hover.event_target()) {
@@ -289,11 +290,11 @@ pub(crate) fn update_brush_face_properties(
             TextColor(tokens::TEXT_PRIMARY),
             ChildOf(apply_all_btn),
         ));
-        commands.entity(apply_all_btn).observe(
-            |_: On<Pointer<Click>>, mut commands: Commands| {
+        commands
+            .entity(apply_all_btn)
+            .observe(|_: On<Pointer<Click>>, mut commands: Commands| {
                 commands.trigger(ApplyTextureToAllFaces);
-            },
-        );
+            });
         commands.entity(apply_all_btn).observe(
             |hover: On<Pointer<Over>>, mut bg: Query<&mut BackgroundColor>| {
                 if let Ok(mut bg) = bg.get_mut(hover.event_target()) {
@@ -374,11 +375,11 @@ pub(crate) fn update_brush_face_properties(
             TextColor(tokens::TEXT_PRIMARY),
             ChildOf(btn),
         ));
-        commands.entity(btn).observe(
-            move |_: On<Pointer<Click>>, mut commands: Commands| {
+        commands
+            .entity(btn)
+            .observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
                 commands.trigger(ApplyUvScalePreset(preset));
-            },
-        );
+            });
         commands.entity(btn).observe(
             |hover: On<Pointer<Over>>, mut bg: Query<&mut BackgroundColor>| {
                 if let Ok(mut bg) = bg.get_mut(hover.event_target()) {
@@ -425,28 +426,18 @@ pub(crate) fn update_brush_face_properties(
     ));
 
     let rotation_degrees = face.uv_rotation.to_degrees() as f64;
-    commands
-        .spawn((
-            numeric_input::numeric_input(rotation_degrees),
-            BrushFaceFieldBinding {
-                field: BrushFaceField::UvRotation,
-            },
-            ChildOf(rot_row),
-        ))
-        .observe(
-            move |changed: On<NumericValueChanged>,
-                  brush_selection: Res<BrushSelection>,
-                  mut brushes: Query<&mut Brush>,
-                  mut history: ResMut<CommandHistory>| {
-                apply_brush_face_field(
-                    BrushFaceField::UvRotation,
-                    changed.value,
-                    &brush_selection,
-                    &mut brushes,
-                    &mut history,
-                );
-            },
-        );
+    commands.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .numeric_f32()
+                .grow()
+                .with_default_value(rotation_degrees.to_string()),
+        ),
+        BrushFaceFieldBinding {
+            field: BrushFaceField::UvRotation,
+        },
+        ChildOf(rot_row),
+    ));
 }
 
 fn spawn_brush_face_field_row(
@@ -488,48 +479,58 @@ fn spawn_brush_face_field_row(
     ));
 
     // X input
-    commands
-        .spawn((
-            numeric_input::numeric_input(x_value),
-            BrushFaceFieldBinding { field: x_field },
-            ChildOf(row),
-        ))
-        .observe(
-            move |changed: On<NumericValueChanged>,
-                  brush_selection: Res<BrushSelection>,
-                  mut brushes: Query<&mut Brush>,
-                  mut history: ResMut<CommandHistory>| {
-                apply_brush_face_field(
-                    x_field,
-                    changed.value,
-                    &brush_selection,
-                    &mut brushes,
-                    &mut history,
-                );
-            },
-        );
+    commands.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .numeric_f32()
+                .grow()
+                .with_default_value(x_value.to_string()),
+        ),
+        BrushFaceFieldBinding { field: x_field },
+        ChildOf(row),
+    ));
 
     // Y input
-    commands
-        .spawn((
-            numeric_input::numeric_input(y_value),
-            BrushFaceFieldBinding { field: y_field },
-            ChildOf(row),
-        ))
-        .observe(
-            move |changed: On<NumericValueChanged>,
-                  brush_selection: Res<BrushSelection>,
-                  mut brushes: Query<&mut Brush>,
-                  mut history: ResMut<CommandHistory>| {
-                apply_brush_face_field(
-                    y_field,
-                    changed.value,
-                    &brush_selection,
-                    &mut brushes,
-                    &mut history,
-                );
-            },
-        );
+    commands.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .numeric_f32()
+                .grow()
+                .with_default_value(y_value.to_string()),
+        ),
+        BrushFaceFieldBinding { field: y_field },
+        ChildOf(row),
+    ));
+}
+
+/// Handle TextEditCommitEvent for brush face field bindings.
+pub(crate) fn on_brush_face_text_commit(
+    event: On<TextEditCommitEvent>,
+    bindings: Query<&BrushFaceFieldBinding>,
+    child_of_query: Query<&ChildOf>,
+    brush_selection: Res<BrushSelection>,
+    mut brushes: Query<&mut Brush>,
+    mut history: ResMut<CommandHistory>,
+) {
+    // Walk up from the committed entity to find a BrushFaceFieldBinding
+    let mut current = event.entity;
+    for _ in 0..4 {
+        let Ok(child_of) = child_of_query.get(current) else {
+            break;
+        };
+        if let Ok(binding) = bindings.get(child_of.parent()) {
+            let value: f64 = event.text.parse().unwrap_or(0.0);
+            apply_brush_face_field(
+                binding.field,
+                value,
+                &brush_selection,
+                &mut brushes,
+                &mut history,
+            );
+            return;
+        }
+        current = child_of.parent();
+    }
 }
 
 fn apply_brush_face_field(

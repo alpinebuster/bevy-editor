@@ -1,13 +1,17 @@
-use bevy::{prelude::*, ui::UiGlobalTransform, window::{CursorGrabMode, CursorOptions}};
+use bevy::{
+    prelude::*,
+    ui::UiGlobalTransform,
+    window::{CursorGrabMode, CursorOptions},
+};
 
 use crate::{
+    EditorEntity,
     commands::{CommandHistory, SetTransform},
     modal_transform::ModalTransformState,
     selection::{Selected, Selection},
     snapping::SnapSettings,
     viewport::SceneViewport,
     viewport_util::{point_to_segment_dist, window_to_viewport_cursor},
-    EditorEntity,
 };
 
 const AXIS_LENGTH: f32 = 1.5;
@@ -168,7 +172,8 @@ fn handle_gizmo_hover(
     };
 
     // Convert window cursor to viewport-local coordinates
-    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query) else {
+    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
+    else {
         return;
     };
 
@@ -230,7 +235,10 @@ fn handle_gizmo_drag(
     ),
 ) {
     // Suppress gizmo drag during modal operations, brush edit mode, or draw mode
-    if modal.active.is_some() || *edit_mode != crate::brush::EditMode::Object || draw_state.active.is_some() {
+    if modal.active.is_some()
+        || *edit_mode != crate::brush::EditMode::Object
+        || draw_state.active.is_some()
+    {
         if drag_state.active {
             drag_state.active = false;
         }
@@ -261,7 +269,8 @@ fn handle_gizmo_drag(
     let Ok((camera, cam_tf)) = camera_query.single() else {
         return;
     };
-    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query) else {
+    let Some(viewport_cursor) = window_to_viewport_cursor(cursor_pos, camera, &viewport_query)
+    else {
         return;
     };
 
@@ -308,12 +317,10 @@ fn handle_gizmo_drag(
         match *mode {
             GizmoMode::Translate => {
                 // Project mouse movement onto axis in screen space
-                let Some(origin_screen) = camera.world_to_viewport(cam_tf, gizmo_pos).ok()
-                else {
+                let Some(origin_screen) = camera.world_to_viewport(cam_tf, gizmo_pos).ok() else {
                     return;
                 };
-                let Some(axis_screen) =
-                    camera.world_to_viewport(cam_tf, gizmo_pos + axis_dir).ok()
+                let Some(axis_screen) = camera.world_to_viewport(cam_tf, gizmo_pos + axis_dir).ok()
                 else {
                     return;
                 };
@@ -344,12 +351,10 @@ fn handle_gizmo_drag(
                 transform.rotation = rotation_delta * drag_state.start_transform.rotation;
             }
             GizmoMode::Scale => {
-                let Some(origin_screen) = camera.world_to_viewport(cam_tf, gizmo_pos).ok()
-                else {
+                let Some(origin_screen) = camera.world_to_viewport(cam_tf, gizmo_pos).ok() else {
                     return;
                 };
-                let Some(axis_screen) =
-                    camera.world_to_viewport(cam_tf, gizmo_pos + axis_dir).ok()
+                let Some(axis_screen) = camera.world_to_viewport(cam_tf, gizmo_pos + axis_dir).ok()
                 else {
                     return;
                 };
@@ -544,4 +549,3 @@ fn axis_color(axis: GizmoAxis, active: Option<GizmoAxis>) -> Color {
         }
     }
 }
-

@@ -2,14 +2,14 @@ use bevy::prelude::*;
 use jackdaw_feathers::status_bar::{StatusBarCenter, StatusBarLeft, StatusBarRight};
 
 use crate::{
-    brush::{BrushEditMode, ClipState, EditMode, VertexDragState, VertexDragConstraint},
+    EditorEntity,
+    brush::{BrushEditMode, ClipState, EditMode, VertexDragConstraint, VertexDragState},
     draw_brush::{DrawBrushState, DrawMode, DrawPhase},
     gizmos::{GizmoMode, GizmoSpace},
     modal_transform::{ModalConstraint, ModalOp, ModalTransformState},
     scene_io::SceneFilePath,
     selection::{Selected, Selection},
     snapping::SnapSettings,
-    EditorEntity,
 };
 
 pub struct StatusBarPlugin;
@@ -18,7 +18,11 @@ impl Plugin for StatusBarPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (update_status_left, update_status_center, update_status_right),
+            (
+                update_status_left,
+                update_status_center,
+                update_status_right,
+            ),
         );
     }
 }
@@ -87,9 +91,8 @@ fn update_status_center(
 
     let total = scene_entities.iter().count();
     let mesh_count = meshes.iter().count();
-    let light_count = point_lights.iter().count()
-        + dir_lights.iter().count()
-        + spot_lights.iter().count();
+    let light_count =
+        point_lights.iter().count() + dir_lights.iter().count() + spot_lights.iter().count();
     let camera_count = cameras.iter().count();
 
     let new_text = format!(
@@ -136,17 +139,25 @@ fn update_status_right(
         };
         text.0 = match active.phase {
             DrawPhase::PlacingFirstCorner => {
-                format!("DRAW BRUSH ({mode_label}): Click to place first corner (Ctrl lock plane, Tab toggle mode) | Esc cancel")
+                format!(
+                    "DRAW BRUSH ({mode_label}): Click to place first corner (Ctrl lock plane, Tab toggle mode) | Esc cancel"
+                )
             }
             DrawPhase::DrawingFootprint => {
-                format!("DRAW BRUSH ({mode_label}): Drag to size rectangle, or release to place polygon vertices | Esc cancel")
+                format!(
+                    "DRAW BRUSH ({mode_label}): Drag to size rectangle, or release to place polygon vertices | Esc cancel"
+                )
             }
             DrawPhase::DrawingPolygon => {
                 let n = active.polygon_vertices.len();
                 if n >= 3 {
-                    format!("DRAW BRUSH ({mode_label}): Click to add vertex ({n} placed), click near first to close, Enter close | Backspace undo, Esc cancel")
+                    format!(
+                        "DRAW BRUSH ({mode_label}): Click to add vertex ({n} placed), click near first to close, Enter close | Backspace undo, Esc cancel"
+                    )
                 } else {
-                    format!("DRAW BRUSH ({mode_label}): Click to add vertex ({n} placed, need 3+) | Backspace undo, Esc cancel")
+                    format!(
+                        "DRAW BRUSH ({mode_label}): Click to add vertex ({n} placed, need 3+) | Backspace undo, Esc cancel"
+                    )
                 }
             }
             DrawPhase::ExtrudingDepth => {
@@ -190,7 +201,8 @@ fn update_status_right(
         } else {
             "Drag to move  Del remove"
         };
-        text.0 = format!("EDIT MODE: {sub_str} | 1 Vert  2 Edge  3 Face  4 Clip | {base_hint}{extra}");
+        text.0 =
+            format!("EDIT MODE: {sub_str} | 1 Vert  2 Edge  3 Face  4 Clip | {base_hint}{extra}");
         return;
     }
 

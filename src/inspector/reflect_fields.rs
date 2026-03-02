@@ -5,6 +5,7 @@ use std::any::TypeId;
 use bevy::{
     ecs::reflect::{AppTypeRegistry, ReflectComponent},
     feathers::theme::ThemedText,
+    input_focus::InputFocus,
     prelude::*,
     reflect::{DynamicEnum, DynamicStruct, DynamicTuple, DynamicVariant, ReflectRef},
     ui_widgets::observe,
@@ -13,12 +14,15 @@ use jackdaw_feathers::{
     checkbox::{CheckboxCommitEvent, CheckboxProps, CheckboxState, checkbox},
     color_picker::{ColorPickerCommitEvent, ColorPickerProps, color_picker},
     combobox::{ComboBoxChangeEvent, combobox_with_selected},
-    list_view, numeric_input, text_input, tokens,
+    list_view,
+    text_edit::{
+        self, TextEditCommitEvent, TextEditConfig, TextEditDragging, TextEditProps, TextEditValue,
+        TextEditVariant, TextEditWrapper, TextInputQueue, set_text_input_value,
+    },
+    tokens,
 };
-use jackdaw_widgets::numeric_input::{NumericInput, NumericValueChanged};
-use jackdaw_widgets::text_input::{EnteredText, TextInput};
 
-use super::{FieldBinding, MAX_REFLECT_DEPTH, AXIS_X_COLOR, AXIS_Y_COLOR, AXIS_Z_COLOR};
+use super::{AXIS_X_COLOR, AXIS_Y_COLOR, AXIS_Z_COLOR, FieldBinding, MAX_REFLECT_DEPTH};
 
 pub(crate) fn spawn_reflected_fields(
     commands: &mut Commands,
@@ -131,9 +135,16 @@ pub(crate) fn spawn_reflected_fields(
             );
         }
         ReflectRef::Map(map) => {
-            spawn_text_row(commands, parent, &format!("{{ {} entries }}", map.len()), depth);
+            spawn_text_row(
+                commands,
+                parent,
+                &format!("{{ {} entries }}", map.len()),
+                depth,
+            );
             if !map.is_empty() {
-                let lv = commands.spawn((list_view::list_view(), ChildOf(parent))).id();
+                let lv = commands
+                    .spawn((list_view::list_view(), ChildOf(parent)))
+                    .id();
                 for (i, (key, val)) in map.iter().enumerate() {
                     let item_entity = commands.spawn((list_view::list_item(i), ChildOf(lv))).id();
                     let key_label = format_partial_reflect_value(key);
@@ -160,12 +171,24 @@ pub(crate) fn spawn_reflected_fields(
             }
         }
         ReflectRef::Set(set) => {
-            spawn_text_row(commands, parent, &format!("{{ {} items }}", set.len()), depth);
+            spawn_text_row(
+                commands,
+                parent,
+                &format!("{{ {} items }}", set.len()),
+                depth,
+            );
             if !set.is_empty() {
-                let lv = commands.spawn((list_view::list_view(), ChildOf(parent))).id();
+                let lv = commands
+                    .spawn((list_view::list_view(), ChildOf(parent)))
+                    .id();
                 for (i, item) in set.iter().enumerate() {
                     let item_entity = commands.spawn((list_view::list_item(i), ChildOf(lv))).id();
-                    spawn_text_row(commands, item_entity, &format_partial_reflect_value(item), depth + 1);
+                    spawn_text_row(
+                        commands,
+                        item_entity,
+                        &format_partial_reflect_value(item),
+                        depth + 1,
+                    );
                 }
             }
         }
@@ -277,9 +300,16 @@ fn spawn_field_row(
 
     // List/Array -> expand with ListView
     if let ReflectRef::List(list) = value.reflect_ref() {
-        spawn_text_row(commands, parent, &format!("{name}: [{} items]", list.len()), depth);
+        spawn_text_row(
+            commands,
+            parent,
+            &format!("{name}: [{} items]", list.len()),
+            depth,
+        );
         if !list.is_empty() {
-            let lv = commands.spawn((list_view::list_view(), ChildOf(parent))).id();
+            let lv = commands
+                .spawn((list_view::list_view(), ChildOf(parent)))
+                .id();
             for i in 0..list.len() {
                 if let Some(item) = list.get(i) {
                     let item_entity = commands.spawn((list_view::list_item(i), ChildOf(lv))).id();
@@ -304,9 +334,16 @@ fn spawn_field_row(
         return;
     }
     if let ReflectRef::Array(array) = value.reflect_ref() {
-        spawn_text_row(commands, parent, &format!("{name}: [{} items]", array.len()), depth);
+        spawn_text_row(
+            commands,
+            parent,
+            &format!("{name}: [{} items]", array.len()),
+            depth,
+        );
         if !array.is_empty() {
-            let lv = commands.spawn((list_view::list_view(), ChildOf(parent))).id();
+            let lv = commands
+                .spawn((list_view::list_view(), ChildOf(parent)))
+                .id();
             for i in 0..array.len() {
                 if let Some(item) = array.get(i) {
                     let item_entity = commands.spawn((list_view::list_item(i), ChildOf(lv))).id();
@@ -331,9 +368,16 @@ fn spawn_field_row(
         return;
     }
     if let ReflectRef::Map(map) = value.reflect_ref() {
-        spawn_text_row(commands, parent, &format!("{name}: {{ {} entries }}", map.len()), depth);
+        spawn_text_row(
+            commands,
+            parent,
+            &format!("{name}: {{ {} entries }}", map.len()),
+            depth,
+        );
         if !map.is_empty() {
-            let lv = commands.spawn((list_view::list_view(), ChildOf(parent))).id();
+            let lv = commands
+                .spawn((list_view::list_view(), ChildOf(parent)))
+                .id();
             for (i, (key, val)) in map.iter().enumerate() {
                 let item_entity = commands.spawn((list_view::list_item(i), ChildOf(lv))).id();
                 let key_label = format_partial_reflect_value(key);
@@ -361,12 +405,24 @@ fn spawn_field_row(
         return;
     }
     if let ReflectRef::Set(set) = value.reflect_ref() {
-        spawn_text_row(commands, parent, &format!("{name}: {{ {} items }}", set.len()), depth);
+        spawn_text_row(
+            commands,
+            parent,
+            &format!("{name}: {{ {} items }}", set.len()),
+            depth,
+        );
         if !set.is_empty() {
-            let lv = commands.spawn((list_view::list_view(), ChildOf(parent))).id();
+            let lv = commands
+                .spawn((list_view::list_view(), ChildOf(parent)))
+                .id();
             for (i, item) in set.iter().enumerate() {
                 let item_entity = commands.spawn((list_view::list_item(i), ChildOf(lv))).id();
-                spawn_text_row(commands, item_entity, &format_partial_reflect_value(item), depth + 1);
+                spawn_text_row(
+                    commands,
+                    item_entity,
+                    &format_partial_reflect_value(item),
+                    depth + 1,
+                );
             }
         }
         return;
@@ -464,39 +520,120 @@ fn spawn_field_row(
 
     // Integer fields -> numeric input with drag-to-scrub
     if let Some(&v) = value.try_downcast_ref::<i32>() {
-        spawn_numeric_field(commands, parent, name, v as f64, field_path, source_entity, component_type_id, depth);
+        spawn_numeric_field(
+            commands,
+            parent,
+            name,
+            v as f64,
+            field_path,
+            source_entity,
+            component_type_id,
+            depth,
+        );
         return;
     }
     if let Some(&v) = value.try_downcast_ref::<u32>() {
-        spawn_numeric_field(commands, parent, name, v as f64, field_path, source_entity, component_type_id, depth);
+        spawn_numeric_field(
+            commands,
+            parent,
+            name,
+            v as f64,
+            field_path,
+            source_entity,
+            component_type_id,
+            depth,
+        );
         return;
     }
     if let Some(&v) = value.try_downcast_ref::<usize>() {
-        spawn_numeric_field(commands, parent, name, v as f64, field_path, source_entity, component_type_id, depth);
+        spawn_numeric_field(
+            commands,
+            parent,
+            name,
+            v as f64,
+            field_path,
+            source_entity,
+            component_type_id,
+            depth,
+        );
         return;
     }
     if let Some(&v) = value.try_downcast_ref::<i8>() {
-        spawn_numeric_field(commands, parent, name, v as f64, field_path, source_entity, component_type_id, depth);
+        spawn_numeric_field(
+            commands,
+            parent,
+            name,
+            v as f64,
+            field_path,
+            source_entity,
+            component_type_id,
+            depth,
+        );
         return;
     }
     if let Some(&v) = value.try_downcast_ref::<i16>() {
-        spawn_numeric_field(commands, parent, name, v as f64, field_path, source_entity, component_type_id, depth);
+        spawn_numeric_field(
+            commands,
+            parent,
+            name,
+            v as f64,
+            field_path,
+            source_entity,
+            component_type_id,
+            depth,
+        );
         return;
     }
     if let Some(&v) = value.try_downcast_ref::<i64>() {
-        spawn_numeric_field(commands, parent, name, v as f64, field_path, source_entity, component_type_id, depth);
+        spawn_numeric_field(
+            commands,
+            parent,
+            name,
+            v as f64,
+            field_path,
+            source_entity,
+            component_type_id,
+            depth,
+        );
         return;
     }
     if let Some(&v) = value.try_downcast_ref::<u8>() {
-        spawn_numeric_field(commands, parent, name, v as f64, field_path, source_entity, component_type_id, depth);
+        spawn_numeric_field(
+            commands,
+            parent,
+            name,
+            v as f64,
+            field_path,
+            source_entity,
+            component_type_id,
+            depth,
+        );
         return;
     }
     if let Some(&v) = value.try_downcast_ref::<u16>() {
-        spawn_numeric_field(commands, parent, name, v as f64, field_path, source_entity, component_type_id, depth);
+        spawn_numeric_field(
+            commands,
+            parent,
+            name,
+            v as f64,
+            field_path,
+            source_entity,
+            component_type_id,
+            depth,
+        );
         return;
     }
     if let Some(&v) = value.try_downcast_ref::<u64>() {
-        spawn_numeric_field(commands, parent, name, v as f64, field_path, source_entity, component_type_id, depth);
+        spawn_numeric_field(
+            commands,
+            parent,
+            name,
+            v as f64,
+            field_path,
+            source_entity,
+            component_type_id,
+            depth,
+        );
         return;
     }
 
@@ -801,30 +938,20 @@ fn spawn_axis_input(
     ));
 
     // Numeric input
-    let path = field_path.clone();
-    let binding_path = field_path;
-    commands
-        .spawn((numeric_input::numeric_input(value), ChildOf(parent)))
-        .insert(FieldBinding {
+    commands.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .numeric_f32()
+                .grow()
+                .with_default_value(value.to_string()),
+        ),
+        FieldBinding {
             source_entity,
             component_type_id,
-            field_path: binding_path,
-        })
-        .observe(
-            move |changed: On<NumericValueChanged>, mut commands: Commands| {
-                let path = path.clone();
-                let value_str = format!("{}", changed.value);
-                commands.queue(move |world: &mut World| {
-                    apply_field_value_with_undo(
-                        world,
-                        source_entity,
-                        component_type_id,
-                        &path,
-                        &value_str,
-                    );
-                });
-            },
-        );
+            field_path,
+        },
+        ChildOf(parent),
+    ));
 }
 
 fn spawn_bool_toggle(
@@ -869,16 +996,19 @@ fn spawn_bool_toggle(
         ChildOf(row),
     ));
 
-    commands
-        .spawn((
-            checkbox(CheckboxProps::new("").checked(value), editor_font, icon_font),
-            FieldBinding {
-                source_entity,
-                component_type_id,
-                field_path,
-            },
-            ChildOf(row),
-        ));
+    commands.spawn((
+        checkbox(
+            CheckboxProps::new("").checked(value),
+            editor_font,
+            icon_font,
+        ),
+        FieldBinding {
+            source_entity,
+            component_type_id,
+            field_path,
+        },
+        ChildOf(row),
+    ));
 }
 
 fn spawn_color_field(
@@ -939,13 +1069,7 @@ fn spawn_color_field(
                 let color = event.color;
                 let path = path.clone();
                 commands.queue(move |world: &mut World| {
-                    apply_color_with_undo(
-                        world,
-                        source_entity,
-                        component_type_id,
-                        &path,
-                        color,
-                    );
+                    apply_color_with_undo(world, source_entity, component_type_id, &path, color);
                 });
             },
         );
@@ -1055,30 +1179,20 @@ fn spawn_numeric_field(
         ChildOf(row),
     ));
 
-    let path = field_path.clone();
-    let binding_path = field_path;
-    commands
-        .spawn((numeric_input::numeric_input(value), ChildOf(row)))
-        .insert(FieldBinding {
+    commands.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .numeric_f32()
+                .grow()
+                .with_default_value(value.to_string()),
+        ),
+        FieldBinding {
             source_entity,
             component_type_id,
-            field_path: binding_path,
-        })
-        .observe(
-            move |changed: On<NumericValueChanged>, mut commands: Commands| {
-                let path = path.clone();
-                let value_str = format!("{}", changed.value);
-                commands.queue(move |world: &mut World| {
-                    apply_field_value_with_undo(
-                        world,
-                        source_entity,
-                        component_type_id,
-                        &path,
-                        &value_str,
-                    );
-                });
-            },
-        );
+            field_path,
+        },
+        ChildOf(row),
+    ));
 }
 
 fn spawn_editable_field(
@@ -1121,34 +1235,20 @@ fn spawn_editable_field(
         ChildOf(row),
     ));
 
-    let input_entity = commands
-        .spawn((text_input::text_input(""), ChildOf(row)))
-        .insert(TextInput::new(current_value))
-        .observe(
-            move |text: On<EnteredText>, mut commands: Commands| {
-                let path = field_path.clone();
-                let value = text.value.clone();
-                commands.queue(move |world: &mut World| {
-                    apply_field_value_with_undo(
-                        world,
-                        source_entity,
-                        component_type_id,
-                        &path,
-                        &value,
-                    );
-                });
-            },
-        )
-        .id();
-
-    commands
-        .entity(input_entity)
-        .entry::<Node>()
-        .and_modify(|mut node| {
-            node.width = Val::Auto;
-            node.flex_grow = 1.0;
-            node.flex_basis = Val::Px(0.0);
-        });
+    commands.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .grow()
+                .with_default_value(current_value)
+                .allow_empty(),
+        ),
+        FieldBinding {
+            source_entity,
+            component_type_id,
+            field_path,
+        },
+        ChildOf(row),
+    ));
 }
 
 /// Apply a field value change with undo support -- snapshots old value, creates command.
@@ -1313,13 +1413,11 @@ fn spawn_entity_link(commands: &mut Commands, parent: Entity, target: Entity, la
                 }
             },
         ),
-        observe(
-            move |out: On<Pointer<Out>>, mut q: Query<&mut TextColor>| {
-                if let Ok(mut c) = q.get_mut(out.event_target()) {
-                    c.0 = tokens::TEXT_ACCENT;
-                }
-            },
-        ),
+        observe(move |out: On<Pointer<Out>>, mut q: Query<&mut TextColor>| {
+            if let Ok(mut c) = q.get_mut(out.event_target()) {
+                c.0 = tokens::TEXT_ACCENT;
+            }
+        }),
     ));
 }
 
@@ -1343,9 +1441,7 @@ fn spawn_list_expansion<'a>(
         .id();
     for i in 0..len {
         if let Some(item) = get_item(i) {
-            let item_entity = commands
-                .spawn((list_view::list_item(i), ChildOf(lv)))
-                .id();
+            let item_entity = commands.spawn((list_view::list_item(i), ChildOf(lv))).id();
             let child_path = if base_path.is_empty() {
                 format!("[{i}]")
             } else {
@@ -1420,33 +1516,20 @@ fn spawn_inline_editable(
     source_entity: Entity,
     component_type_id: TypeId,
 ) {
-    let input_entity = commands
-        .spawn((text_input::text_input(""), ChildOf(parent)))
-        .insert(TextInput::new(current_value))
-        .observe(
-            move |text: On<EnteredText>, mut commands: Commands| {
-                let path = field_path.clone();
-                let value = text.value.clone();
-                commands.queue(move |world: &mut World| {
-                    apply_field_value_with_undo(
-                        world,
-                        source_entity,
-                        component_type_id,
-                        &path,
-                        &value,
-                    );
-                });
-            },
-        )
-        .id();
-    commands
-        .entity(input_entity)
-        .entry::<Node>()
-        .and_modify(|mut node| {
-            node.width = Val::Auto;
-            node.flex_grow = 1.0;
-            node.flex_basis = Val::Px(0.0);
-        });
+    commands.spawn((
+        text_edit::text_edit(
+            TextEditProps::default()
+                .grow()
+                .with_default_value(current_value)
+                .allow_empty(),
+        ),
+        FieldBinding {
+            source_entity,
+            component_type_id,
+            field_path,
+        },
+        ChildOf(parent),
+    ));
 }
 
 fn spawn_text_row(commands: &mut Commands, parent: Entity, text: &str, depth: usize) {
@@ -1523,6 +1606,51 @@ fn format_partial_reflect_value(value: &dyn PartialReflect) -> String {
     format!("{value:?}")
 }
 
+/// Handle TextEditCommitEvent for inspector field bindings (numeric and string fields).
+pub(crate) fn on_text_edit_commit(
+    event: On<TextEditCommitEvent>,
+    bindings: Query<(&FieldBinding, Option<&TextEditVariant>)>,
+    child_of_query: Query<&ChildOf>,
+    mut commands: Commands,
+) {
+    // Walk up from the committed entity to find a FieldBinding
+    let mut current = event.entity;
+    let mut found = None;
+    for _ in 0..4 {
+        let Ok(child_of) = child_of_query.get(current) else {
+            break;
+        };
+        if let Ok((binding, variant)) = bindings.get(child_of.parent()) {
+            found = Some((
+                binding.source_entity,
+                binding.component_type_id,
+                binding.field_path.clone(),
+                variant.copied(),
+            ));
+            break;
+        }
+        current = child_of.parent();
+    }
+
+    let Some((source_entity, component_type_id, path, variant)) = found else {
+        return;
+    };
+
+    // For numeric fields, use the text as-is (already formatted)
+    // For string fields, use text directly
+    let value_str = if variant.is_some_and(|v| v.is_numeric()) {
+        // Parse and re-format to ensure consistent value
+        let val: f64 = event.text.parse().unwrap_or(0.0);
+        format!("{val}")
+    } else {
+        event.text.clone()
+    };
+
+    commands.queue(move |world: &mut World| {
+        apply_field_value_with_undo(world, source_entity, component_type_id, &path, &value_str);
+    });
+}
+
 pub(crate) fn on_checkbox_commit(
     event: On<CheckboxCommitEvent>,
     bindings: Query<&FieldBinding>,
@@ -1541,7 +1669,7 @@ pub(crate) fn on_checkbox_commit(
 }
 
 /// Refreshes inspector field values using reflection -- handles all component types generically.
-/// Uses exclusive world access to avoid query conflicts between EntityRef and &mut NumericInput.
+/// Uses exclusive world access to avoid query conflicts.
 pub(crate) fn refresh_inspector_fields(world: &mut World) {
     let selection = world.resource::<Selection>();
     let Some(primary) = selection.primary() else {
@@ -1551,12 +1679,17 @@ pub(crate) fn refresh_inspector_fields(world: &mut World) {
     let type_registry = world.resource::<AppTypeRegistry>().clone();
     let registry = type_registry.read();
 
-    // Collect numeric binding info and current input values
-    let mut numeric_lookups: Vec<(Entity, TypeId, String, f64)> = Vec::new();
-    let mut query = world.query::<(Entity, &FieldBinding, &NumericInput)>();
-    for (entity, binding, input) in query.iter(world) {
-        if binding.source_entity == primary {
-            numeric_lookups.push((entity, binding.component_type_id, binding.field_path.clone(), input.value));
+    // Collect numeric binding info: outer entity + current TextEditValue
+    let mut numeric_lookups: Vec<(Entity, TypeId, String, String)> = Vec::new();
+    let mut query = world.query::<(Entity, &FieldBinding, &TextEditValue, &TextEditConfig)>();
+    for (entity, binding, value, config) in query.iter(world) {
+        if binding.source_entity == primary && config.variant.is_numeric() {
+            numeric_lookups.push((
+                entity,
+                binding.component_type_id,
+                binding.field_path.clone(),
+                value.0.clone(),
+            ));
         }
     }
 
@@ -1565,7 +1698,12 @@ pub(crate) fn refresh_inspector_fields(world: &mut World) {
     let mut checkbox_query = world.query::<(Entity, &FieldBinding, &CheckboxState)>();
     for (entity, binding, state) in checkbox_query.iter(world) {
         if binding.source_entity == primary {
-            bool_lookups.push((entity, binding.component_type_id, binding.field_path.clone(), state.checked));
+            bool_lookups.push((
+                entity,
+                binding.component_type_id,
+                binding.field_path.clone(),
+                state.checked,
+            ));
         }
     }
 
@@ -1574,13 +1712,14 @@ pub(crate) fn refresh_inspector_fields(world: &mut World) {
     }
 
     // Read reflected values and compute updates
+    // For numeric fields: we need to find inner EditorTextEdit entity and set its value
     let mut numeric_updates: Vec<(Entity, f64)> = Vec::new();
     let mut bool_updates: Vec<(Entity, bool)> = Vec::new();
     let Ok(entity_ref) = world.get_entity(primary) else {
         return;
     };
 
-    for (ui_entity, comp_type_id, field_path, current_val) in &numeric_lookups {
+    for (ui_entity, comp_type_id, field_path, current_text) in &numeric_lookups {
         let Some(registration) = registry.get(*comp_type_id) else {
             continue;
         };
@@ -1598,7 +1737,8 @@ pub(crate) fn refresh_inspector_fields(world: &mut World) {
             continue;
         };
 
-        if (*current_val - value).abs() > f64::EPSILON {
+        let current_val: f64 = current_text.parse().unwrap_or(0.0);
+        if (current_val - value).abs() > 0.005 {
             numeric_updates.push((*ui_entity, value));
         }
     }
@@ -1625,10 +1765,28 @@ pub(crate) fn refresh_inspector_fields(world: &mut World) {
 
     drop(registry);
 
-    // Apply numeric updates
-    for (entity, value) in numeric_updates {
-        if let Some(mut input) = world.get_mut::<NumericInput>(entity) {
-            input.value = value;
+    // Apply numeric updates: find inner EditorTextEdit entity and use set_text_input_value
+    let input_focus = world.resource::<InputFocus>().0;
+    for (outer_entity, value) in numeric_updates {
+        // Walk: outer (TextEditConfig) → children → wrapper (TextEditWrapper) → inner entity
+        let Some((wrapper_entity, inner_entity)) = find_text_edit_entities(world, outer_entity)
+        else {
+            continue;
+        };
+
+        // Skip if the field is being drag-adjusted or the user is typing in it
+        if world.get::<TextEditDragging>(wrapper_entity).is_some() {
+            continue;
+        }
+        if input_focus == Some(inner_entity) {
+            continue;
+        }
+
+        if let Some(variant) = world.get::<TextEditVariant>(inner_entity).copied() {
+            let formatted = text_edit::format_numeric_value(value, variant);
+            if let Some(mut queue) = world.get_mut::<TextInputQueue>(inner_entity) {
+                set_text_input_value(&mut queue, formatted);
+            }
         }
     }
 
@@ -1638,6 +1796,25 @@ pub(crate) fn refresh_inspector_fields(world: &mut World) {
             state.checked = value;
         }
     }
+}
+
+/// Walk from an outer text_edit entity to find the wrapper and inner EditorTextEdit entities.
+/// Returns (wrapper_entity, inner_entity).
+fn find_text_edit_entities(world: &World, outer_entity: Entity) -> Option<(Entity, Entity)> {
+    let children = world.get::<Children>(outer_entity)?;
+    for child in children.iter() {
+        if let Some(wrapper) = world.get::<TextEditWrapper>(child) {
+            return Some((child, wrapper.0));
+        }
+        if let Some(grandchildren) = world.get::<Children>(child) {
+            for gc in grandchildren.iter() {
+                if let Some(wrapper) = world.get::<TextEditWrapper>(gc) {
+                    return Some((gc, wrapper.0));
+                }
+            }
+        }
+    }
+    None
 }
 
 fn reflect_field_to_f64(field: &dyn PartialReflect) -> Option<f64> {
@@ -1697,11 +1874,21 @@ fn spawn_enum_field(
 
     // Try to get variant names from type info
     let Some(type_info) = enum_ref.get_represented_type_info() else {
-        spawn_text_row(commands, parent, &format!("variant: {current_variant}"), depth);
+        spawn_text_row(
+            commands,
+            parent,
+            &format!("variant: {current_variant}"),
+            depth,
+        );
         return;
     };
     let bevy::reflect::TypeInfo::Enum(enum_info) = type_info else {
-        spawn_text_row(commands, parent, &format!("variant: {current_variant}"), depth);
+        spawn_text_row(
+            commands,
+            parent,
+            &format!("variant: {current_variant}"),
+            depth,
+        );
         return;
     };
 
@@ -1712,7 +1899,12 @@ fn spawn_enum_field(
         .collect();
 
     if variant_names.is_empty() {
-        spawn_text_row(commands, parent, &format!("variant: {current_variant}"), depth);
+        spawn_text_row(
+            commands,
+            parent,
+            &format!("variant: {current_variant}"),
+            depth,
+        );
         return;
     }
 
@@ -1889,8 +2081,7 @@ fn apply_enum_variant_with_undo(
             field.to_dynamic()
         };
 
-        let Some(dynamic_variant) =
-            build_dynamic_variant(old_value.as_ref(), variant_name, &reg)
+        let Some(dynamic_variant) = build_dynamic_variant(old_value.as_ref(), variant_name, &reg)
         else {
             continue;
         };

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use jackdaw_widgets::context_menu::{ContextMenuAction, ContextMenuItem};
 
-use crate::button::{button, ButtonClickEvent, ButtonProps, ButtonVariant};
+use crate::button::{ButtonClickEvent, ButtonProps, ButtonVariant, button};
 use crate::tokens;
 
 pub fn plugin(app: &mut App) {

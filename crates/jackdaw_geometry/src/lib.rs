@@ -20,7 +20,11 @@ pub struct BrushFaceData {
 }
 
 /// Solve the intersection of three planes. Returns None if degenerate.
-pub fn plane_triple_intersection(p1: &BrushPlane, p2: &BrushPlane, p3: &BrushPlane) -> Option<Vec3> {
+pub fn plane_triple_intersection(
+    p1: &BrushPlane,
+    p2: &BrushPlane,
+    p3: &BrushPlane,
+) -> Option<Vec3> {
     let n1 = p1.normal;
     let n2 = p2.normal;
     let n3 = p3.normal;
@@ -30,7 +34,9 @@ pub fn plane_triple_intersection(p1: &BrushPlane, p2: &BrushPlane, p3: &BrushPla
         return None;
     }
 
-    let point = (n2.cross(n3) * p1.distance + n3.cross(n1) * p2.distance + n1.cross(n2) * p3.distance) / det;
+    let point =
+        (n2.cross(n3) * p1.distance + n3.cross(n1) * p2.distance + n1.cross(n2) * p3.distance)
+            / det;
     Some(point)
 }
 
@@ -54,11 +60,9 @@ pub fn compute_brush_geometry(faces: &[BrushFaceData]) -> (Vec<Vec3>, Vec<Vec<us
     for i in 0..n {
         for j in (i + 1)..n {
             for k in (j + 1)..n {
-                if let Some(point) = plane_triple_intersection(
-                    &faces[i].plane,
-                    &faces[j].plane,
-                    &faces[k].plane,
-                ) {
+                if let Some(point) =
+                    plane_triple_intersection(&faces[i].plane, &faces[j].plane, &faces[k].plane)
+                {
                     // Keep only if inside all planes
                     if point_inside_all_planes(point, faces) {
                         // Deduplicate
@@ -111,7 +115,9 @@ pub fn sort_face_vertices_by_winding(vertices: &[Vec3], indices: &mut [usize], n
         let db = vertices[b] - centroid;
         let angle_a = da.dot(v_axis).atan2(da.dot(u_axis));
         let angle_b = db.dot(v_axis).atan2(db.dot(u_axis));
-        angle_a.partial_cmp(&angle_b).unwrap_or(std::cmp::Ordering::Equal)
+        angle_a
+            .partial_cmp(&angle_b)
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
 }
 
@@ -122,11 +128,7 @@ pub fn triangulate_face(indices: &[usize]) -> Vec<[u32; 3]> {
         return triangles;
     }
     for i in 1..(indices.len() - 1) {
-        triangles.push([
-            indices[0] as u32,
-            indices[i] as u32,
-            indices[i + 1] as u32,
-        ]);
+        triangles.push([indices[0] as u32, indices[i] as u32, indices[i + 1] as u32]);
     }
     triangles
 }
@@ -176,7 +178,11 @@ pub fn compute_face_uvs(
 }
 
 /// Transform brush face planes from local space to world space.
-pub fn brush_planes_to_world(faces: &[BrushFaceData], rotation: Quat, translation: Vec3) -> Vec<BrushFaceData> {
+pub fn brush_planes_to_world(
+    faces: &[BrushFaceData],
+    rotation: Quat,
+    translation: Vec3,
+) -> Vec<BrushFaceData> {
     faces
         .iter()
         .map(|face| {

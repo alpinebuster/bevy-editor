@@ -7,8 +7,7 @@ use bevy::{
 };
 
 use super::{
-    BrushFaceEntity, BrushMaterialPalette, BrushMeshCache, TextureCacheEntry,
-    TextureMaterialCache,
+    BrushFaceEntity, BrushMaterialPalette, BrushMeshCache, TextureCacheEntry, TextureMaterialCache,
 };
 use jackdaw_geometry::{compute_brush_geometry, compute_face_uvs, triangulate_face};
 
@@ -17,14 +16,14 @@ pub(super) fn setup_default_materials(
     mut palette: ResMut<BrushMaterialPalette>,
 ) {
     let defaults = [
-        Color::srgb(0.7, 0.7, 0.7),  // default grey (matches Cube mesh)
-        Color::srgb(0.5, 0.5, 0.5),  // gray
-        Color::srgb(0.3, 0.3, 0.3),  // dark gray
-        Color::srgb(0.7, 0.3, 0.2),  // brick red
-        Color::srgb(0.3, 0.5, 0.7),  // steel blue
-        Color::srgb(0.4, 0.6, 0.3),  // mossy green
-        Color::srgb(0.6, 0.5, 0.3),  // sandy tan
-        Color::srgb(0.5, 0.3, 0.5),  // purple
+        Color::srgb(0.7, 0.7, 0.7), // default grey (matches Cube mesh)
+        Color::srgb(0.5, 0.5, 0.5), // gray
+        Color::srgb(0.3, 0.3, 0.3), // dark gray
+        Color::srgb(0.7, 0.3, 0.2), // brick red
+        Color::srgb(0.3, 0.5, 0.7), // steel blue
+        Color::srgb(0.4, 0.6, 0.3), // mossy green
+        Color::srgb(0.6, 0.5, 0.3), // sandy tan
+        Color::srgb(0.5, 0.3, 0.5), // purple
     ];
     for color in defaults {
         palette.materials.push(materials.add(StandardMaterial {
@@ -58,7 +57,9 @@ pub(super) fn ensure_texture_materials(
             base_color_texture: Some(image.clone()),
             ..default()
         });
-        cache.entries.insert(path, TextureCacheEntry { image, material });
+        cache
+            .entries
+            .insert(path, TextureCacheEntry { image, material });
     }
 }
 
@@ -117,7 +118,8 @@ pub(super) fn regenerate_brush_meshes(
             }
 
             // Build per-face mesh with local vertex positions
-            let positions: Vec<[f32; 3]> = indices.iter().map(|&vi| vertices[vi].to_array()).collect();
+            let positions: Vec<[f32; 3]> =
+                indices.iter().map(|&vi| vertices[vi].to_array()).collect();
             let normals: Vec<[f32; 3]> = vec![face_data.plane.normal.to_array(); indices.len()];
             let uvs = compute_face_uvs(
                 &vertices,
@@ -130,7 +132,8 @@ pub(super) fn regenerate_brush_meshes(
 
             // Fan triangulate — local indices (0..positions.len())
             let local_tris = triangulate_face(&(0..indices.len()).collect::<Vec<_>>());
-            let flat_indices: Vec<u32> = local_tris.iter().flat_map(|t| t.iter().copied()).collect();
+            let flat_indices: Vec<u32> =
+                local_tris.iter().flat_map(|t| t.iter().copied()).collect();
 
             let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);

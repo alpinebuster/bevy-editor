@@ -5,13 +5,12 @@ use bevy::{
 };
 
 use super::{
-    CHUNK_SIZE, TerrainBrushSettings, TerrainDirtyChunks, TerrainEditMode,
-    TerrainSculptState,
+    CHUNK_SIZE, TerrainBrushSettings, TerrainDirtyChunks, TerrainEditMode, TerrainSculptState,
 };
+use crate::EditorEntity;
 use crate::commands::{CommandHistory, EditorCommand};
 use crate::selection::Selection;
 use crate::viewport::SceneViewport;
-use crate::EditorEntity;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
@@ -90,8 +89,7 @@ fn terrain_sculpt_interaction(
         sculpt_state.brush_position = None;
         return;
     };
-    let Ok((terrain_entity, mut terrain, terrain_tf, mut dirty)) =
-        terrain_query.get_mut(selected)
+    let Ok((terrain_entity, mut terrain, terrain_tf, mut dirty)) = terrain_query.get_mut(selected)
     else {
         sculpt_state.brush_position = None;
         return;

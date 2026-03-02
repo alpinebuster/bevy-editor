@@ -5,8 +5,7 @@ use bevy_ui_text_input::actions::{TextInputAction, TextInputEdit};
 
 use super::color_math::{parse_hex, rgb_to_hsv};
 use super::{
-    ColorInputMode, ColorInputRow, ColorPickerChangeEvent, ColorPickerCommitEvent,
-    ColorPickerState,
+    ColorInputMode, ColorInputRow, ColorPickerChangeEvent, ColorPickerCommitEvent, ColorPickerState,
 };
 
 use crate::combobox::{ComboBoxChangeEvent, combobox_icon_with_selected};

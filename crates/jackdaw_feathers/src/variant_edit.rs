@@ -2,12 +2,8 @@ use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use lucide_icons::Icon;
 
-use crate::button::{
-    ButtonClickEvent, ButtonProps, ButtonVariant, EditorButton, button,
-};
-use crate::combobox::{
-    ComboBoxChangeEvent, ComboBoxOptionData, combobox_with_selected,
-};
+use crate::button::{ButtonClickEvent, ButtonProps, ButtonVariant, EditorButton, button};
+use crate::combobox::{ComboBoxChangeEvent, ComboBoxOptionData, combobox_with_selected};
 use crate::icons::{EditorFont, IconFont};
 use crate::inspector_field::path_to_label;
 use crate::popover::{

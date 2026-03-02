@@ -1,13 +1,16 @@
 use std::path::Path;
 
 use bevy::prelude::*;
-use jackdaw_feathers::{panel_header, text_input, tokens};
-use jackdaw_widgets::text_input::TextInput;
+use jackdaw_feathers::{
+    panel_header,
+    text_edit::{self, TextEditProps, TextEditValue},
+    tokens,
+};
 
 use crate::{
+    EditorEntity,
     brush::{Brush, BrushEditMode, BrushSelection, EditMode, LastUsedTexture, SetBrush},
     commands::CommandHistory,
-    EditorEntity,
 };
 
 pub struct TextureBrowserPlugin;
@@ -18,7 +21,11 @@ impl Plugin for TextureBrowserPlugin {
             .add_systems(Startup, scan_textures)
             .add_systems(
                 Update,
-                (rescan_textures, apply_texture_filter, update_texture_browser_ui),
+                (
+                    rescan_textures,
+                    apply_texture_filter,
+                    update_texture_browser_ui,
+                ),
             )
             .add_observer(handle_apply_texture);
     }
@@ -47,28 +54,30 @@ pub struct ApplyTextureToFaces {
 #[derive(Event, Debug, Clone)]
 pub struct ClearTextureFromFaces;
 
-fn scan_textures(
-    mut available: ResMut<AvailableTextures>,
-    asset_server: Res<AssetServer>,
-) {
+fn scan_textures(mut available: ResMut<AvailableTextures>, asset_server: Res<AssetServer>) {
     do_scan_textures(&mut available, &asset_server);
 }
 
 fn do_scan_textures(available: &mut AvailableTextures, asset_server: &AssetServer) {
     available.textures.clear();
 
-    let assets_dir = std::env::current_dir()
-        .unwrap_or_default()
-        .join("assets");
+    let assets_dir = std::env::current_dir().unwrap_or_default().join("assets");
 
     if !assets_dir.is_dir() {
         return;
     }
 
-    scan_directory(&assets_dir, &assets_dir, asset_server, &mut available.textures);
+    scan_directory(
+        &assets_dir,
+        &assets_dir,
+        asset_server,
+        &mut available.textures,
+    );
 
     // Sort alphabetically
-    available.textures.sort_by(|a, b| a.file_name.cmp(&b.file_name));
+    available
+        .textures
+        .sort_by(|a, b| a.file_name.cmp(&b.file_name));
 }
 
 fn scan_directory(
@@ -109,13 +118,13 @@ fn is_image_file(path: &Path) -> bool {
         return false;
     };
     let ext = ext.to_string_lossy().to_lowercase();
-    matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "bmp" | "tga" | "webp")
+    matches!(
+        ext.as_str(),
+        "png" | "jpg" | "jpeg" | "bmp" | "tga" | "webp"
+    )
 }
 
-fn rescan_textures(
-    mut available: ResMut<AvailableTextures>,
-    asset_server: Res<AssetServer>,
-) {
+fn rescan_textures(mut available: ResMut<AvailableTextures>, asset_server: Res<AssetServer>) {
     if !available.needs_rescan {
         return;
     }
@@ -184,12 +193,12 @@ pub struct TextureThumbnail {
 
 /// Update the filter string from the text input.
 fn apply_texture_filter(
-    filter_input: Query<&TextInput, (With<TextureBrowserFilter>, Changed<TextInput>)>,
+    filter_input: Query<&TextEditValue, (With<TextureBrowserFilter>, Changed<TextEditValue>)>,
     mut available: ResMut<AvailableTextures>,
 ) {
     for input in &filter_input {
-        if available.filter != input.value {
-            available.filter = input.value.clone();
+        if available.filter != input.0 {
+            available.filter = input.0.clone();
         }
     }
 }
@@ -231,9 +240,7 @@ fn update_texture_browser_ui(
         // Thumbnail container
         let thumb_entity = commands
             .spawn((
-                TextureThumbnail {
-                    path: path.clone(),
-                },
+                TextureThumbnail { path: path.clone() },
                 Node {
                     width: Val::Px(64.0),
                     height: Val::Px(80.0),
@@ -329,9 +336,14 @@ pub fn texture_browser_panel() -> impl Bundle {
                     flex_shrink: 0.0,
                     ..Default::default()
                 },
-                children![
-                    (TextureBrowserFilter, text_input::text_input("Filter textures")),
-                ],
+                children![(
+                    TextureBrowserFilter,
+                    text_edit::text_edit(
+                        TextEditProps::default()
+                            .with_placeholder("Filter textures")
+                            .allow_empty()
+                    )
+                ),],
             ),
             // Grid
             (
@@ -357,9 +369,7 @@ pub fn texture_browser_panel() -> impl Bundle {
 
 /// Convert an absolute filesystem path to an asset-relative path.
 pub fn to_asset_relative_path(absolute: &str) -> Option<String> {
-    let assets_dir = std::env::current_dir()
-        .ok()?
-        .join("assets");
+    let assets_dir = std::env::current_dir().ok()?.join("assets");
     let abs_path = Path::new(absolute);
     let relative = abs_path
         .strip_prefix(&assets_dir)

@@ -3,7 +3,7 @@ use jackdaw_widgets::menu_bar::{
     MenuAction, MenuBar, MenuBarDropdown, MenuBarDropdownItem, MenuBarItem, MenuBarState,
 };
 
-use crate::button::{button, ButtonClickEvent, ButtonProps, ButtonVariant};
+use crate::button::{ButtonClickEvent, ButtonProps, ButtonVariant, button};
 use crate::tokens;
 
 pub fn plugin(app: &mut App) {
@@ -181,12 +181,7 @@ fn spawn_menu_bar_item(
     ));
 }
 
-fn spawn_dropdown(
-    commands: &mut Commands,
-    x: f32,
-    y: f32,
-    actions: &[(String, String)],
-) -> Entity {
+fn spawn_dropdown(commands: &mut Commands, x: f32, y: f32, actions: &[(String, String)]) -> Entity {
     let dropdown = commands
         .spawn((
             MenuBarDropdown,

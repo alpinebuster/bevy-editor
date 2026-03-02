@@ -6,7 +6,11 @@ use crate::{icons::IconFont, tokens};
 
 /// Spawn a file browser item (grid cell).
 pub fn file_browser_item(item: &FileBrowserItem, icon_font: &IconFont) -> impl Bundle {
-    let icon = if item.is_directory { Icon::Folder } else { file_icon(&item.file_name) };
+    let icon = if item.is_directory {
+        Icon::Folder
+    } else {
+        file_icon(&item.file_name)
+    };
     let icon_color = if item.is_directory {
         tokens::DIR_ICON_COLOR
     } else {
@@ -52,7 +56,11 @@ pub fn file_browser_item(item: &FileBrowserItem, icon_font: &IconFont) -> impl B
 
 /// Spawn a file browser item for list view mode.
 pub fn file_browser_list_item(item: &FileBrowserItem, icon_font: &IconFont) -> impl Bundle {
-    let icon = if item.is_directory { Icon::Folder } else { file_icon(&item.file_name) };
+    let icon = if item.is_directory {
+        Icon::Folder
+    } else {
+        file_icon(&item.file_name)
+    };
     let icon_color = if item.is_directory {
         tokens::DIR_ICON_COLOR
     } else {

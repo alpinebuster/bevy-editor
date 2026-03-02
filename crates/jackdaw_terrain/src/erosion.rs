@@ -103,10 +103,7 @@ pub fn hydraulic_erosion(heights: &mut [f32], resolution: u32, params: &ErosionP
             let new_z = pos_z + dir_z;
 
             // Check bounds
-            if new_x < 1.0
-                || new_x >= (res - 2) as f32
-                || new_z < 1.0
-                || new_z >= (res - 2) as f32
+            if new_x < 1.0 || new_x >= (res - 2) as f32 || new_z < 1.0 || new_z >= (res - 2) as f32
             {
                 break;
             }
@@ -134,7 +131,15 @@ pub fn hydraulic_erosion(heights: &mut [f32], resolution: u32, params: &ErosionP
                 };
 
                 sediment -= deposit;
-                deposit_at(heights, res, node_x, node_z, cell_offset_x, cell_offset_z, deposit);
+                deposit_at(
+                    heights,
+                    res,
+                    node_x,
+                    node_z,
+                    cell_offset_x,
+                    cell_offset_z,
+                    deposit,
+                );
             } else {
                 // Erode terrain
                 let erode_amount = ((c - sediment) * params.erosion).min(-height_diff);

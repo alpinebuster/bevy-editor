@@ -128,7 +128,11 @@ fn tree_row_content(
     category: EntityCategory,
     style: &TreeRowStyle,
 ) -> impl Bundle {
-    let bg = if selected { tokens::SELECTED_BG } else { ROW_BG };
+    let bg = if selected {
+        tokens::SELECTED_BG
+    } else {
+        ROW_BG
+    };
     let border = if selected {
         tokens::SELECTED_BORDER
     } else {
@@ -313,7 +317,9 @@ fn expand_toggle(has_children: bool, icon_font: &Handle<Font>) -> impl Bundle {
                 let mut current = click.event_target();
                 for _ in 0..4 {
                     if let Ok((entity, expanded)) = tree_node_query.get(current) {
-                        commands.entity(entity).insert(TreeNodeExpanded(!expanded.0));
+                        commands
+                            .entity(entity)
+                            .insert(TreeNodeExpanded(!expanded.0));
                         return;
                     }
                     let Ok(&ChildOf(parent)) = parent_query.get(current) else {
@@ -346,16 +352,18 @@ fn visibility_toggle(source: Entity, icon_font: &Handle<Font>) -> impl Bundle {
             },
             TextColor(tokens::TEXT_SECONDARY.with_alpha(0.4)),
         )],
-        observe(move |mut click: On<Pointer<Click>>, mut commands: Commands| {
-            if click.event.button != PointerButton::Primary {
-                return;
-            }
-            click.propagate(false);
-            commands.trigger(TreeRowVisibilityToggled {
-                entity: click.event_target(),
-                source_entity: source,
-            });
-        }),
+        observe(
+            move |mut click: On<Pointer<Click>>, mut commands: Commands| {
+                if click.event.button != PointerButton::Primary {
+                    return;
+                }
+                click.propagate(false);
+                commands.trigger(TreeRowVisibilityToggled {
+                    entity: click.event_target(),
+                    source_entity: source,
+                });
+            },
+        ),
         observe(
             |hover: On<Pointer<Over>>,
              children_query: Query<&Children>,
@@ -435,8 +443,7 @@ fn find_source_entity(
 pub fn tree_container_drop_observers() -> impl Bundle {
     (
         observe(
-            |mut drag_enter: On<Pointer<DragEnter>>,
-             mut bg_query: Query<&mut BackgroundColor>| {
+            |mut drag_enter: On<Pointer<DragEnter>>, mut bg_query: Query<&mut BackgroundColor>| {
                 drag_enter.propagate(false);
                 if let Ok(mut bg) = bg_query.get_mut(drag_enter.event_target()) {
                     bg.0 = tokens::CONTAINER_DROP_TARGET_BG;
@@ -444,8 +451,7 @@ pub fn tree_container_drop_observers() -> impl Bundle {
             },
         ),
         observe(
-            |mut drag_leave: On<Pointer<DragLeave>>,
-             mut bg_query: Query<&mut BackgroundColor>| {
+            |mut drag_leave: On<Pointer<DragLeave>>, mut bg_query: Query<&mut BackgroundColor>| {
                 drag_leave.propagate(false);
                 if let Ok(mut bg) = bg_query.get_mut(drag_leave.event_target()) {
                     bg.0 = Color::NONE;
@@ -495,12 +501,8 @@ pub fn tree_keyboard_navigation(
     tree_node_query: Query<&TreeNode>,
 ) {
     // Collect all visible tree rows in order
-    let visible_rows = collect_visible_rows(
-        &tree_view,
-        &tree_nodes,
-        &tree_row_children,
-        &node_query,
-    );
+    let visible_rows =
+        collect_visible_rows(&tree_view, &tree_nodes, &tree_row_children, &node_query);
 
     if visible_rows.is_empty() {
         return;
@@ -533,9 +535,7 @@ pub fn tree_keyboard_navigation(
             if let Ok((entity, expanded, _)) = tree_nodes.get(focused_entity) {
                 if expanded.0 {
                     // Collapse the node
-                    commands
-                        .entity(entity)
-                        .insert(TreeNodeExpanded(false));
+                    commands.entity(entity).insert(TreeNodeExpanded(false));
                 }
                 // If already collapsed, could move to parent — but skipping for now
             }
@@ -548,9 +548,7 @@ pub fn tree_keyboard_navigation(
                 let has_children = children.iter().any(|c| tree_row_children.contains(c));
                 if has_children && !expanded.0 {
                     // Expand the node
-                    commands
-                        .entity(entity)
-                        .insert(TreeNodeExpanded(true));
+                    commands.entity(entity).insert(TreeNodeExpanded(true));
                 }
             }
         }

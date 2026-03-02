@@ -5,9 +5,14 @@ use bevy::text::{FontFeatureTag, FontFeatures};
 use bevy_ui_text_input::actions::{TextInputAction, TextInputEdit};
 use bevy_ui_text_input::*;
 
+// Re-export key types from bevy_ui_text_input for consumers
+pub use bevy_ui_text_input::{TextInputBuffer, TextInputQueue};
+
 use crate::cursor::{ActiveCursor, HoverCursor};
 use crate::icons::EditorFont;
-use crate::tokens::{BORDER_COLOR, PRIMARY_COLOR, TEXT_BODY_COLOR, TEXT_MUTED_COLOR, TEXT_SIZE, TEXT_SIZE_SM};
+use crate::tokens::{
+    BORDER_COLOR, PRIMARY_COLOR, TEXT_BODY_COLOR, TEXT_MUTED_COLOR, TEXT_SIZE, TEXT_SIZE_SM,
+};
 
 pub fn plugin(app: &mut App) {
     if !app.is_plugin_added::<TextInputPlugin>() {
@@ -23,6 +28,7 @@ pub fn plugin(app: &mut App) {
                 handle_drag_value,
                 handle_click_to_focus,
                 handle_clamp_on_unfocus,
+                sync_text_edit_values,
             ),
         )
         .add_systems(PostUpdate, (apply_default_value, handle_suffix).chain());
@@ -39,6 +45,11 @@ pub struct TextEditCommitEvent {
     pub text: String,
 }
 
+/// Synced from the inner `TextInputBuffer` every frame. Attach to the outer wrapper entity
+/// so consumers can poll the current text value without reaching into child entities.
+#[derive(Component, Default, Clone)]
+pub struct TextEditValue(pub String);
+
 const INPUT_HEIGHT: f32 = 28.0;
 const AFFIX_SIZE: u64 = 16;
 
@@ -46,7 +57,12 @@ const AFFIX_SIZE: u64 = 16;
 pub struct EditorTextEdit;
 
 #[derive(Component)]
-struct TextEditWrapper(Entity);
+pub struct TextEditWrapper(pub Entity);
+
+/// Marker inserted on the wrapper entity while the user is drag-adjusting a numeric value.
+/// Used by consumers to skip refresh/sync that would overwrite the in-flight drag value.
+#[derive(Component)]
+pub struct TextEditDragging;
 
 #[derive(Component, Default, Clone, Copy, PartialEq)]
 pub enum TextEditVariant {
@@ -99,9 +115,9 @@ pub enum FilterType {
 }
 
 #[derive(Component)]
-struct TextEditConfig {
+pub struct TextEditConfig {
     label: Option<String>,
-    variant: TextEditVariant,
+    pub variant: TextEditVariant,
     filter: Option<FilterType>,
     prefix: Option<TextEditPrefix>,
     suffix: Option<String>,
@@ -111,7 +127,7 @@ struct TextEditConfig {
     max: f64,
     allow_empty: bool,
     drag_bottom: bool,
-    initialized: bool,
+    pub initialized: bool,
 }
 
 pub struct TextEditProps {
@@ -126,6 +142,7 @@ pub struct TextEditProps {
     pub max: f64,
     pub allow_empty: bool,
     pub drag_bottom: bool,
+    pub grow: bool,
 }
 
 impl Default for TextEditProps {
@@ -142,6 +159,7 @@ impl Default for TextEditProps {
             max: f64::MAX,
             allow_empty: false,
             drag_bottom: false,
+            grow: false,
         }
     }
 }
@@ -183,6 +201,10 @@ impl TextEditProps {
         self.drag_bottom = true;
         self
     }
+    pub fn grow(mut self) -> Self {
+        self.grow = true;
+        self
+    }
     pub fn numeric_f32(mut self) -> Self {
         self.variant = TextEditVariant::NumericF32;
         self.filter = Some(FilterType::Decimal);
@@ -220,13 +242,14 @@ pub fn text_edit(props: TextEditProps) -> impl Bundle {
         max,
         allow_empty,
         drag_bottom,
+        grow,
     } = props;
 
     (
         Node {
             flex_direction: FlexDirection::Column,
             row_gap: px(3),
-            flex_grow: 1.0,
+            flex_grow: if grow { 1.0 } else { 0.0 },
             flex_shrink: 1.0,
             flex_basis: px(0),
             ..default()
@@ -245,6 +268,7 @@ pub fn text_edit(props: TextEditProps) -> impl Bundle {
             drag_bottom,
             initialized: false,
         },
+        TextEditValue::default(),
     )
 }
 
@@ -498,8 +522,7 @@ fn handle_suffix(
     const WRAPPER_PADDING: f32 = 8.0;
     const PREFIX_EXTRA: f32 = AFFIX_SIZE as f32 + 6.0;
     for (entity, buffer, layout_info, child_of) in &text_edits {
-        let Some((_, mut node)) = suffix_nodes.iter_mut().find(|(link, _)| link.0 == entity)
-        else {
+        let Some((_, mut node)) = suffix_nodes.iter_mut().find(|(link, _)| link.0 == entity) else {
             continue;
         };
 
@@ -695,6 +718,7 @@ fn handle_drag_value(
                 commands
                     .entity(entity)
                     .insert(ActiveCursor(bevy::window::SystemCursorIcon::ColResize));
+                commands.entity(child_of.parent()).insert(TextEditDragging);
             }
         }
 
@@ -707,6 +731,9 @@ fn handle_drag_value(
                         text,
                     });
                 }
+                commands
+                    .entity(child_of.parent())
+                    .remove::<TextEditDragging>();
             }
             hitbox.dragging = false;
             commands.entity(entity).remove::<ActiveCursor>();
@@ -751,15 +778,12 @@ fn parse_numeric_value(text: &str, suffix: Option<&TextEditSuffix>) -> f64 {
     strip_suffix(text, suffix).parse().unwrap_or(0.0)
 }
 
-fn format_numeric_value(value: f64, variant: TextEditVariant) -> String {
+pub fn format_numeric_value(value: f64, variant: TextEditVariant) -> String {
     match variant {
         TextEditVariant::NumericI32 => (value.round() as i32).to_string(),
         TextEditVariant::NumericF32 => {
-            let mut text = value.to_string();
-            if !text.contains('.') {
-                text.push_str(".0");
-            }
-            text
+            let rounded = (value * 100.0).round() / 100.0;
+            format!("{rounded:.2}")
         }
         TextEditVariant::Default => value.to_string(),
     }
@@ -780,4 +804,30 @@ fn update_input_value(
 ) {
     let clamped = clamp_value(value, range);
     set_text_input_value(queue, format_numeric_value(clamped, variant));
+}
+
+fn sync_text_edit_values(
+    mut configs: Query<(&TextEditConfig, &Children, &mut TextEditValue)>,
+    wrappers: Query<&TextEditWrapper>,
+    buffers: Query<&TextInputBuffer, With<EditorTextEdit>>,
+) {
+    for (config, children, mut value) in &mut configs {
+        if !config.initialized {
+            continue;
+        }
+        // Find wrapper child → TextEditWrapper → inner entity → TextInputBuffer
+        for child in children.iter() {
+            let Ok(wrapper) = wrappers.get(child) else {
+                continue;
+            };
+            let Ok(buffer) = buffers.get(wrapper.0) else {
+                continue;
+            };
+            let text = buffer.get_text();
+            if value.0 != text {
+                value.0 = text;
+            }
+            break;
+        }
+    }
 }

@@ -18,11 +18,10 @@ pub struct AlignmentGuidesPlugin;
 
 impl Plugin for AlignmentGuidesPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<AlignmentGuideState>()
-            .add_systems(
-                Update,
-                (cache_reference_aabbs, draw_alignment_guides).chain(),
-            );
+        app.init_resource::<AlignmentGuideState>().add_systems(
+            Update,
+            (cache_reference_aabbs, draw_alignment_guides).chain(),
+        );
     }
 }
 
@@ -97,10 +96,7 @@ fn cache_reference_aabbs(
     gizmo_mode: Res<GizmoMode>,
     modal_state: Res<ModalTransformState>,
     viewport_drag: Res<ViewportDragState>,
-    non_selected: Query<
-        (Entity, &GlobalTransform, Option<&BrushMeshCache>),
-        Without<Selected>,
-    >,
+    non_selected: Query<(Entity, &GlobalTransform, Option<&BrushMeshCache>), Without<Selected>>,
     children_query: Query<&Children>,
     mesh_query: Query<(&Mesh3d, &GlobalTransform)>,
     meshes: Res<Assets<Mesh>>,
@@ -111,9 +107,7 @@ fn cache_reference_aabbs(
         return;
     }
 
-    let dragging = is_translate_drag_active(
-        &gizmo_drag, &gizmo_mode, &modal_state, &viewport_drag,
-    );
+    let dragging = is_translate_drag_active(&gizmo_drag, &gizmo_mode, &modal_state, &viewport_drag);
 
     if !dragging {
         state.cache_valid = false;
@@ -169,10 +163,7 @@ fn draw_alignment_guides(
     viewport_drag: Res<ViewportDragState>,
     transforms: Query<&GlobalTransform>,
     camera_query: Query<&GlobalTransform, (With<Camera3d>, With<crate::EditorEntity>)>,
-    selected: Query<
-        (Entity, &GlobalTransform, Option<&BrushMeshCache>),
-        With<Selected>,
-    >,
+    selected: Query<(Entity, &GlobalTransform, Option<&BrushMeshCache>), With<Selected>>,
     mut selected_transforms: Query<&mut Transform, With<Selected>>,
     children_query: Query<&Children>,
     mesh_query: Query<(&Mesh3d, &GlobalTransform)>,
@@ -183,7 +174,11 @@ fn draw_alignment_guides(
     }
 
     let Some((dragged_entity, drag_pos)) = dragged_entity_position(
-        &gizmo_drag, &gizmo_mode, &modal_state, &viewport_drag, &transforms,
+        &gizmo_drag,
+        &gizmo_mode,
+        &modal_state,
+        &viewport_drag,
+        &transforms,
     ) else {
         return;
     };
@@ -250,9 +245,27 @@ fn draw_alignment_guides(
     for ref_aabb in &state.reference_aabbs {
         let r_center = (ref_aabb.min + ref_aabb.max) * 0.5;
         let r_vals = [
-            [ref_aabb.max.x, ref_aabb.min.x, r_center.x, ref_aabb.min.x, ref_aabb.max.x],
-            [ref_aabb.max.y, ref_aabb.min.y, r_center.y, ref_aabb.min.y, ref_aabb.max.y],
-            [ref_aabb.max.z, ref_aabb.min.z, r_center.z, ref_aabb.min.z, ref_aabb.max.z],
+            [
+                ref_aabb.max.x,
+                ref_aabb.min.x,
+                r_center.x,
+                ref_aabb.min.x,
+                ref_aabb.max.x,
+            ],
+            [
+                ref_aabb.max.y,
+                ref_aabb.min.y,
+                r_center.y,
+                ref_aabb.min.y,
+                ref_aabb.max.y,
+            ],
+            [
+                ref_aabb.max.z,
+                ref_aabb.min.z,
+                r_center.z,
+                ref_aabb.min.z,
+                ref_aabb.max.z,
+            ],
         ];
 
         for axis_idx in 0..3 {
@@ -285,7 +298,8 @@ fn draw_alignment_guides(
                             None => true,
                         };
                         if is_better {
-                            best_snap[axis_idx] = Some((abs_delta, delta, aligned_val, ref_aabb.min, ref_aabb.max));
+                            best_snap[axis_idx] =
+                                Some((abs_delta, delta, aligned_val, ref_aabb.min, ref_aabb.max));
                         }
                     }
                 }
@@ -295,8 +309,8 @@ fn draw_alignment_guides(
 
     // Apply snaps
     if let Ok(mut transform) = selected_transforms.get_mut(dragged_entity) {
-        for axis_idx in 0..3 {
-            if let Some((_, delta, _, _, _)) = best_snap[axis_idx] {
+        for (axis_idx, snap) in best_snap.iter().enumerate() {
+            if let Some((_, delta, _, _, _)) = snap {
                 match axis_idx {
                     0 => transform.translation.x += delta,
                     1 => transform.translation.y += delta,
@@ -352,7 +366,8 @@ fn draw_alignment_line(
         end[perp] = line_end_perp;
         // Set the other perpendicular axis to the midpoint of both AABBs
         let other_perp = if perp == perp_a { perp_b } else { perp_a };
-        let other_mid = (d_min[other_perp] + d_max[other_perp] + r_min[other_perp] + r_max[other_perp]) * 0.25;
+        let other_mid =
+            (d_min[other_perp] + d_max[other_perp] + r_min[other_perp] + r_max[other_perp]) * 0.25;
         start[other_perp] = other_mid;
         end[other_perp] = other_mid;
 

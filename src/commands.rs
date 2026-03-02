@@ -307,11 +307,7 @@ pub(crate) fn collect_entity_ids(world: &World, entity: Entity, out: &mut Vec<En
 /// Rebuild a DynamicScene by copying its entity data (since DynamicScene doesn't impl Clone).
 pub(crate) fn snapshot_rebuild(scene: &DynamicScene) -> DynamicScene {
     DynamicScene {
-        resources: scene
-            .resources
-            .iter()
-            .map(|r| r.to_dynamic())
-            .collect(),
+        resources: scene.resources.iter().map(|r| r.to_dynamic()).collect(),
         entities: scene
             .entities
             .iter()

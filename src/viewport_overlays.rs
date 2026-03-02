@@ -27,7 +27,10 @@ impl Plugin for ViewportOverlaysPlugin {
                     draw_camera_gizmo,
                 ),
             )
-            .add_systems(Update, (draw_coordinate_indicator, draw_navmesh_region_bounds));
+            .add_systems(
+                Update,
+                (draw_coordinate_indicator, draw_navmesh_region_bounds),
+            );
     }
 }
 
@@ -93,13 +96,11 @@ fn draw_selection_bounding_boxes(
                     draw_hull_wireframe(&mut gizmos, &verts, &cache.face_polygons, color);
                     continue;
                 }
-                BoundingBoxMode::Aabb => {
-                    cache
-                        .vertices
-                        .iter()
-                        .map(|v| global_tf.transform_point(*v))
-                        .collect::<Vec<Vec3>>()
-                }
+                BoundingBoxMode::Aabb => cache
+                    .vertices
+                    .iter()
+                    .map(|v| global_tf.transform_point(*v))
+                    .collect::<Vec<Vec3>>(),
             }
         } else {
             let mut verts = Vec::new();
@@ -136,10 +137,8 @@ fn draw_selection_bounding_boxes(
                     .map(|p| Vec3::new(p.x, p.y, p.z))
                     .collect();
                 let hull_faces = brush::merge_hull_triangles(&hull_positions, &hull_tris);
-                let face_polygons: Vec<Vec<usize>> = hull_faces
-                    .into_iter()
-                    .map(|f| f.vertex_indices)
-                    .collect();
+                let face_polygons: Vec<Vec<usize>> =
+                    hull_faces.into_iter().map(|f| f.vertex_indices).collect();
                 draw_hull_wireframe(&mut gizmos, &hull_positions, &face_polygons, color);
             }
         }
@@ -220,7 +219,8 @@ pub(crate) fn collect_descendant_mesh_world_vertices(
 ) {
     if let Ok((mesh3d, global_tf)) = mesh_query.get(entity) {
         if let Some(mesh) = meshes.get(&mesh3d.0) {
-            if let Some(positions) = mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+            if let Some(positions) = mesh
+                .attribute(Mesh::ATTRIBUTE_POSITION)
                 .and_then(|attr| attr.as_float3())
             {
                 for pos in positions {
@@ -373,9 +373,21 @@ fn draw_coordinate_indicator(
         + cam_tf.up().as_vec3() * -0.5;
     let size = 0.1;
 
-    gizmos.line(indicator_pos, indicator_pos + Vec3::X * size, Color::srgb(1.0, 0.2, 0.2));
-    gizmos.line(indicator_pos, indicator_pos + Vec3::Y * size, Color::srgb(0.2, 1.0, 0.2));
-    gizmos.line(indicator_pos, indicator_pos + Vec3::Z * size, Color::srgb(0.2, 0.4, 1.0));
+    gizmos.line(
+        indicator_pos,
+        indicator_pos + Vec3::X * size,
+        Color::srgb(1.0, 0.2, 0.2),
+    );
+    gizmos.line(
+        indicator_pos,
+        indicator_pos + Vec3::Y * size,
+        Color::srgb(0.2, 1.0, 0.2),
+    );
+    gizmos.line(
+        indicator_pos,
+        indicator_pos + Vec3::Z * size,
+        Color::srgb(0.2, 0.4, 1.0),
+    );
 }
 
 /// Draw wireframe cuboid for NavmeshRegion entities showing their AABB bounds.

@@ -8,7 +8,7 @@ repository = "https://github.com/jbuehler23/jackdaw"
 
 [dependencies]
 bevy.workspace = true
-jackdaw_geometry = { path = "../jackdaw_geometry" }
+jackdaw_geometry.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 thiserror = "2"

@@ -6,24 +6,24 @@ use bevy_monitors::prelude::{Mutation, NotifyChanged};
 use jackdaw_feathers::{
     context_menu::spawn_context_menu,
     icons::IconFont,
-    text_input, tokens,
-    tree_view::{tree_row, TreeRowStyle, ROW_BG},
+    text_edit::{self, EditorTextEdit, TextEditCommitEvent, TextEditProps, TextEditValue},
+    tokens,
+    tree_view::{ROW_BG, TreeRowStyle, tree_row},
 };
 use jackdaw_widgets::context_menu::{ContextMenuAction, ContextMenuCloseSet, ContextMenuState};
-use jackdaw_widgets::text_input::{EnteredText, TextInput, TextInputPlacholder};
 use jackdaw_widgets::tree_view::{
     EntityCategory, TreeChildrenPopulated, TreeFocused, TreeIndex, TreeNode, TreeNodeExpanded,
-    TreeRowChildren, TreeRowClicked, TreeRowContent,
-    TreeRowDropped, TreeRowDroppedOnRoot, TreeRowInlineRename, TreeRowLabel, TreeRowRenamed,
-    TreeRowSelected, TreeRowStartRename, TreeRowVisibilityToggled,
+    TreeRowChildren, TreeRowClicked, TreeRowContent, TreeRowDropped, TreeRowDroppedOnRoot,
+    TreeRowInlineRename, TreeRowLabel, TreeRowRenamed, TreeRowSelected, TreeRowStartRename,
+    TreeRowVisibilityToggled,
 };
 
 use crate::{
+    EditorEntity, EditorHidden,
     commands::{CommandHistory, EditorCommand, ReparentEntity, SetComponentField},
     entity_ops,
     layout::HierarchyFilter,
     selection::{Selected, Selection},
-    EditorEntity, EditorHidden,
 };
 use jackdaw_feathers::dialog::{DialogActionEvent, DialogChildrenSlot};
 
@@ -58,11 +58,13 @@ impl Plugin for HierarchyPlugin {
                 (
                     apply_hierarchy_filter,
                     cancel_inline_rename,
+                    auto_focus_inline_rename,
                     handle_hierarchy_right_click.after(ContextMenuCloseSet),
                     populate_template_dialog,
                     jackdaw_feathers::tree_view::tree_keyboard_navigation,
                 ),
             )
+            .add_observer(handle_inline_rename_commit)
             .add_observer(on_root_entity_added)
             .add_observer(on_entity_reparented)
             .add_observer(on_tree_node_expanded)
@@ -107,18 +109,13 @@ fn has_visible_children(world: &World, entity: Entity) -> bool {
         return false;
     };
     children.iter().any(|child| {
-        world.get::<EditorEntity>(child).is_none()
-            && world.get::<EditorHidden>(child).is_none()
+        world.get::<EditorEntity>(child).is_none() && world.get::<EditorHidden>(child).is_none()
     })
 }
 
 /// Spawn a single (non-recursive) tree row for a source entity.
 /// Updates TreeIndex immediately.
-fn spawn_single_tree_row(
-    world: &mut World,
-    source: Entity,
-    parent_container: Entity,
-) -> Entity {
+fn spawn_single_tree_row(world: &mut World, source: Entity, parent_container: Entity) -> Entity {
     let label = world
         .get::<Name>(source)
         .map(|n| n.as_str().to_string())
@@ -352,11 +349,10 @@ fn on_entity_reparented(
 
     // Find the new parent's TreeRowChildren container via TreeIndex + child walk
     let parent_container = tree_index.get(new_parent).and_then(|parent_tree| {
-        children_query.get(parent_tree).ok().and_then(|children| {
-            children
-                .iter()
-                .find(|c| tree_row_children.contains(*c))
-        })
+        children_query
+            .get(parent_tree)
+            .ok()
+            .and_then(|children| children.iter().find(|c| tree_row_children.contains(*c)))
     });
 
     // If tree row already exists for this entity → reparent it
@@ -418,7 +414,12 @@ fn on_entity_removed(
 fn on_tree_node_expanded(
     trigger: On<Mutation<TreeNodeExpanded>>,
     mut commands: Commands,
-    tree_query: Query<(&TreeNodeExpanded, &TreeChildrenPopulated, &TreeNode, &Children)>,
+    tree_query: Query<(
+        &TreeNodeExpanded,
+        &TreeChildrenPopulated,
+        &TreeNode,
+        &Children,
+    )>,
     tree_row_children_marker: Query<Entity, With<TreeRowChildren>>,
 ) {
     let entity = trigger.event_target();
@@ -767,10 +768,7 @@ fn handle_hierarchy_right_click(
 }
 
 /// Handle context menu actions for hierarchy operations.
-fn on_context_menu_action(
-    event: On<ContextMenuAction>,
-    mut commands: Commands,
-) {
+fn on_context_menu_action(event: On<ContextMenuAction>, mut commands: Commands) {
     let target_entity = event.target_entity;
 
     match event.action.as_str() {
@@ -818,7 +816,10 @@ fn on_context_menu_action(
         "hierarchy.add_light" => {
             if let Some(parent) = target_entity {
                 commands.queue(move |world: &mut World| {
-                    entity_ops::create_entity_in_world(world, entity_ops::EntityTemplate::PointLight);
+                    entity_ops::create_entity_in_world(
+                        world,
+                        entity_ops::EntityTemplate::PointLight,
+                    );
                     let selection = world.resource::<Selection>();
                     if let Some(new_entity) = selection.primary() {
                         world.entity_mut(new_entity).insert(ChildOf(parent));
@@ -841,7 +842,9 @@ fn on_context_menu_action(
             if let Some(target) = target_entity {
                 // Store the target entity and open a dialog for template name
                 commands.queue(move |world: &mut World| {
-                    world.resource_mut::<crate::entity_templates::PendingTemplateSave>().entity = Some(target);
+                    world
+                        .resource_mut::<crate::entity_templates::PendingTemplateSave>()
+                        .entity = Some(target);
                     // Get the entity name as default template name
                     let default_name = world
                         .get::<Name>(target)
@@ -898,71 +901,58 @@ fn on_visibility_toggled(
     });
 }
 
+/// Marker for inline rename text_edit entity, linking back to the label entity and source entity.
+#[derive(Component)]
+struct InlineRenameInput {
+    label_entity: Entity,
+    source_entity: Entity,
+}
+
 /// Cancel inline rename on Escape key.
 fn cancel_inline_rename(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut commands: Commands,
-    rename_query: Query<(Entity, &Children), With<TreeRowInlineRename>>,
-    tree_nodes: Query<&TreeNode>,
-    parent_query: Query<&ChildOf>,
+    rename_query: Query<(Entity, &InlineRenameInput)>,
     names: Query<&Name>,
     mut input_focus: ResMut<InputFocus>,
 ) {
     if !keyboard.just_pressed(KeyCode::Escape) {
         return;
     }
-    for (label_entity, children) in &rename_query {
+    for (rename_entity, inline_rename) in &rename_query {
         input_focus.clear();
 
-        // Walk up to find the TreeNode and get the source entity for original name
-        let mut current = label_entity;
-        let mut source_entity = None;
-        for _ in 0..4 {
-            let Ok(&ChildOf(parent)) = parent_query.get(current) else {
-                break;
-            };
-            if let Ok(tree_node) = tree_nodes.get(parent) {
-                source_entity = Some(tree_node.0);
-                break;
-            }
-            current = parent;
-        }
-
-        let original_name = source_entity
-            .and_then(|e| names.get(e).ok())
+        let original_name = names
+            .get(inline_rename.source_entity)
             .map(|n| n.as_str().to_string())
             .unwrap_or_default();
 
-        // Despawn children added by text_input() (TextInputDisplay etc.)
-        for child in children.iter() {
-            commands.entity(child).despawn();
+        // Unhide the label and restore its text
+        commands
+            .entity(inline_rename.label_entity)
+            .remove::<TreeRowInlineRename>();
+        if let Ok(mut ec) = commands.get_entity(inline_rename.label_entity) {
+            ec.insert(Text::new(original_name));
+            ec.entry::<Node>().and_modify(|mut node| {
+                node.display = Display::Flex;
+            });
         }
 
-        // Restore label
-        commands.entity(label_entity).remove::<(
-            TreeRowInlineRename,
-            TextInput,
-            TextInputPlacholder,
-            BackgroundColor,
-            BorderColor,
-        )>();
-        commands
-            .entity(label_entity)
-            .insert(Text::new(original_name));
+        // Despawn the rename text_edit entity
+        commands.entity(rename_entity).despawn();
     }
 }
 
-/// Start inline rename: replace label text with a text input.
+/// Start inline rename: hide the label and spawn a text_edit sibling.
 fn on_tree_row_start_rename(
     event: On<TreeRowStartRename>,
     mut commands: Commands,
     tree_index: Res<TreeIndex>,
     tree_nodes: Query<&Children, With<TreeNode>>,
-    content_query: Query<&Children, With<TreeRowContent>>,
+    content_query: Query<(Entity, &Children), With<TreeRowContent>>,
     label_query: Query<Entity, With<TreeRowLabel>>,
     names: Query<&Name>,
-    rename_check: Query<(), With<TreeRowInlineRename>>,
-    mut input_focus: ResMut<InputFocus>,
+    rename_check: Query<(), With<InlineRenameInput>>,
 ) {
     let source = event.source_entity;
 
@@ -978,13 +968,15 @@ fn on_tree_row_start_rename(
         return;
     };
 
-    // Find the TreeRowLabel entity
+    // Find the TreeRowContent entity and the TreeRowLabel entity within it
     let mut label_entity = None;
+    let mut content_entity = None;
     for child in children.iter() {
-        if let Ok(content_children) = content_query.get(child) {
+        if let Ok((content_e, content_children)) = content_query.get(child) {
             for grandchild in content_children.iter() {
                 if label_query.contains(grandchild) {
                     label_entity = Some(grandchild);
+                    content_entity = Some(content_e);
                     break;
                 }
             }
@@ -993,71 +985,132 @@ fn on_tree_row_start_rename(
     let Some(label_entity) = label_entity else {
         return;
     };
+    let Some(content_entity) = content_entity else {
+        return;
+    };
 
     let current_name = names
         .get(source)
         .map(|n| n.as_str().to_string())
         .unwrap_or_default();
 
-    // Remove the static Text so it doesn't render alongside the text input
-    commands.entity(label_entity).remove::<Text>();
-    // Replace the label with a text input
-    commands.entity(label_entity).insert((
-        TreeRowInlineRename,
-        text_input::text_input(""),
-    ));
-    // Set the value separately — text_input() already includes TextInput::default()
+    // Hide the label and mark it so we can restore later
+    commands.entity(label_entity).insert(TreeRowInlineRename);
     commands
         .entity(label_entity)
-        .insert(TextInput::new(current_name));
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.display = Display::None;
+        });
 
-    // Focus the input
-    input_focus.set(label_entity);
-
-    // Add Enter/Escape observers
-    let source_entity = source;
-    commands.entity(label_entity).observe(
-        move |text: On<EnteredText>, mut commands: Commands| {
-            commands.trigger(TreeRowRenamed {
-                entity: text.entity,
-                source_entity,
-                new_name: text.value.clone(),
-            });
+    // Spawn the text_edit as a sibling inside the content entity
+    commands.spawn((
+        InlineRenameInput {
+            label_entity,
+            source_entity: source,
         },
-    );
+        text_edit::text_edit(
+            TextEditProps::default()
+                .with_default_value(current_name)
+                .allow_empty(),
+        ),
+        ChildOf(content_entity),
+    ));
 }
 
-/// Commit inline rename: update Name with undo, restore label.
-fn on_tree_row_renamed(
-    event: On<TreeRowRenamed>,
-    mut commands: Commands,
-    names: Query<&Name>,
-    children_query: Query<&Children>,
+/// Auto-focus inline rename text_edit inputs one frame after spawn.
+fn auto_focus_inline_rename(
+    rename_inputs: Query<(Entity, &InlineRenameInput, &Children)>,
+    wrappers: Query<&jackdaw_feathers::text_edit::TextEditConfig>,
+    wrapper_children: Query<&Children>,
+    editor_text_edits: Query<Entity, With<EditorTextEdit>>,
     mut input_focus: ResMut<InputFocus>,
 ) {
-    let source = event.source_entity;
-    let new_name = event.new_name.clone();
-    let label_entity = event.entity;
-
-    // Clear focus
-    input_focus.clear();
-
-    // Despawn children added by text_input() (TextInputDisplay etc.)
-    if let Ok(children) = children_query.get(label_entity) {
+    for (_rename_entity, _inline, children) in &rename_inputs {
+        // The text_edit outer entity has children: [wrapper] which has children: [..., EditorTextEdit]
         for child in children.iter() {
-            commands.entity(child).despawn();
+            if wrappers.contains(child) {
+                // this is the label/wrapper -- skip, we need the actual wrapper node
+                continue;
+            }
+            // child might be the wrapper entity (has TextEditWrapper inside)
+            if let Ok(wrapper_kids) = wrapper_children.get(child) {
+                for wk in wrapper_kids.iter() {
+                    if editor_text_edits.contains(wk) {
+                        if input_focus.0 != Some(wk) {
+                            input_focus.0 = Some(wk);
+                        }
+                        return;
+                    }
+                }
+            }
         }
     }
+}
 
-    // Restore label: remove text input components, restore TreeRowLabel text
-    commands.entity(label_entity).remove::<(
-        TreeRowInlineRename,
-        TextInput,
-        TextInputPlacholder,
-        BackgroundColor,
-        BorderColor,
-    )>();
-    commands.entity(label_entity).insert(Text::new(new_name.clone()));
+/// Handle TextEditCommitEvent for inline renames.
+fn handle_inline_rename_commit(
+    event: On<TextEditCommitEvent>,
+    rename_inputs: Query<(Entity, &InlineRenameInput)>,
+    child_of_query: Query<&ChildOf>,
+    mut commands: Commands,
+    mut input_focus: ResMut<InputFocus>,
+) {
+    // Walk up from the committed entity to find if it belongs to an InlineRenameInput
+    // event.entity is the inner EditorTextEdit → parent is wrapper → parent is text_edit outer → parent is content
+    // The InlineRenameInput is on the text_edit outer entity
+    let mut current = event.entity;
+    let mut found = None;
+    for _ in 0..4 {
+        let Ok(child_of) = child_of_query.get(current) else {
+            break;
+        };
+        if let Ok((rename_entity, inline_rename)) = rename_inputs.get(child_of.parent()) {
+            found = Some((
+                rename_entity,
+                inline_rename.label_entity,
+                inline_rename.source_entity,
+            ));
+            break;
+        }
+        current = child_of.parent();
+    }
+
+    let Some((rename_entity, label_entity, source_entity)) = found else {
+        return;
+    };
+
+    input_focus.clear();
+
+    // Restore label
+    commands
+        .entity(label_entity)
+        .remove::<TreeRowInlineRename>();
+    commands
+        .entity(label_entity)
+        .insert(Text::new(event.text.clone()));
+    commands
+        .entity(label_entity)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.display = Display::Flex;
+        });
+
+    // Despawn the rename text_edit entity
+    commands.entity(rename_entity).despawn();
+
+    // Trigger the rename
+    commands.trigger(TreeRowRenamed {
+        entity: label_entity,
+        source_entity,
+        new_name: event.text.clone(),
+    });
+}
+
+/// Commit inline rename: update Name with undo.
+fn on_tree_row_renamed(event: On<TreeRowRenamed>, mut commands: Commands, names: Query<&Name>) {
+    let source = event.source_entity;
+    let new_name = event.new_name.clone();
 
     // Apply name change with undo
     let old_name = names
@@ -1092,7 +1145,6 @@ fn populate_template_dialog(
     default_name: Res<PendingTemplateDefaultName>,
     slots: Query<(Entity, &Children), (With<DialogChildrenSlot>, Changed<Children>)>,
     existing_inputs: Query<(), With<TemplateNameInput>>,
-    mut input_focus: ResMut<InputFocus>,
 ) {
     // Only act when there's a pending template save
     if pending.entity.is_none() {
@@ -1104,15 +1156,16 @@ fn populate_template_dialog(
     }
     for (slot_entity, children) in &slots {
         if children.is_empty() {
-            let input_entity = commands
-                .spawn((
-                    TemplateNameInput,
-                    text_input::text_input("Template name..."),
-                    TextInput::new(default_name.0.clone()),
-                    ChildOf(slot_entity),
-                ))
-                .id();
-            input_focus.set(input_entity);
+            commands.spawn((
+                TemplateNameInput,
+                text_edit::text_edit(
+                    TextEditProps::default()
+                        .with_placeholder("Template name...")
+                        .with_default_value(default_name.0.clone())
+                        .allow_empty(),
+                ),
+                ChildOf(slot_entity),
+            ));
         }
     }
 }
@@ -1122,7 +1175,7 @@ fn on_template_dialog_action(
     _event: On<DialogActionEvent>,
     mut commands: Commands,
     pending: Res<crate::entity_templates::PendingTemplateSave>,
-    name_inputs: Query<&TextInput, With<TemplateNameInput>>,
+    name_inputs: Query<&TextEditValue, With<TemplateNameInput>>,
 ) {
     let Some(_entity) = pending.entity else {
         return;
@@ -1131,7 +1184,7 @@ fn on_template_dialog_action(
     let name = name_inputs
         .iter()
         .next()
-        .map(|input| input.value.trim().to_string())
+        .map(|input| input.0.trim().to_string())
         .unwrap_or_default();
 
     if name.is_empty() {
@@ -1140,24 +1193,26 @@ fn on_template_dialog_action(
 
     commands.queue(move |world: &mut World| {
         crate::entity_templates::save_entity_template(world, &name);
-        world.resource_mut::<crate::entity_templates::PendingTemplateSave>().entity = None;
+        world
+            .resource_mut::<crate::entity_templates::PendingTemplateSave>()
+            .entity = None;
     });
 }
 
 /// Filter hierarchy tree rows based on the filter text input.
 fn apply_hierarchy_filter(
-    filter_input: Query<&jackdaw_widgets::text_input::TextInput, (With<HierarchyFilter>, Changed<jackdaw_widgets::text_input::TextInput>)>,
+    filter_input: Query<&TextEditValue, (With<HierarchyFilter>, Changed<TextEditValue>)>,
     tree_nodes: Query<(Entity, &TreeNode)>,
     names: Query<&Name>,
     parent_query: Query<&ChildOf>,
     tree_row_children_query: Query<(), With<TreeRowChildren>>,
     mut display_query: Query<&mut Node>,
 ) {
-    let Ok(text_input) = filter_input.single() else {
+    let Ok(text_edit_value) = filter_input.single() else {
         return;
     };
 
-    let filter = text_input.value.trim().to_lowercase();
+    let filter = text_edit_value.0.trim().to_lowercase();
 
     if filter.is_empty() {
         for (tree_entity, _) in &tree_nodes {

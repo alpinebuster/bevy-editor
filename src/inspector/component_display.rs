@@ -20,9 +20,9 @@ use jackdaw_widgets::collapsible::{
 };
 
 use super::{
-    AddComponentButton, ComponentDisplay, ComponentDisplayBody, ComponentPicker,
-    ReflectDisplayable, Inspector, extract_module_group,
-    custom_props_display, material_display, brush_display, reflect_fields,
+    AddComponentButton, ComponentDisplay, ComponentDisplayBody, ComponentPicker, Inspector,
+    ReflectDisplayable, brush_display, custom_props_display, extract_module_group,
+    material_display, reflect_fields,
 };
 
 pub(crate) fn add_component_displays(
@@ -57,17 +57,16 @@ pub(crate) fn add_component_displays(
         commands.spawn((
             ComponentDisplay,
             Node {
-                padding: UiRect::axes(
-                    Val::Px(tokens::SPACING_MD),
-                    Val::Px(tokens::SPACING_SM),
-                ),
+                padding: UiRect::axes(Val::Px(tokens::SPACING_MD), Val::Px(tokens::SPACING_SM)),
                 width: Val::Percent(100.0),
                 ..Default::default()
             },
             BackgroundColor(tokens::SELECTED_BG),
             ChildOf(*inspector),
             children![(
-                Text::new(format!("{sel_count} entities selected — edits apply to all")),
+                Text::new(format!(
+                    "{sel_count} entities selected — edits apply to all"
+                )),
                 TextFont {
                     font: editor_font.0.clone(),
                     font_size: tokens::FONT_SM,
@@ -106,12 +105,19 @@ pub(crate) fn add_component_displays(
             if name.starts_with("jackdaw") && !name.starts_with("jackdaw_jsn") {
                 return None;
             }
-            Some((name.shortname().to_string(), "Other".to_string(), component_id))
+            Some((
+                name.shortname().to_string(),
+                "Other".to_string(),
+                component_id,
+            ))
         })
         .collect();
 
     // Sort by (group, name)
-    comp_list.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())));
+    comp_list.sort_by(|a, b| {
+        a.1.cmp(&b.1)
+            .then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase()))
+    });
 
     // Group by module and spawn with group headers
     let mut current_group = String::new();
@@ -189,8 +195,14 @@ pub(crate) fn add_component_displays(
         }
 
         let component_id = *component_id;
-        let (display_entity, body_entity) =
-            spawn_component_display(&mut commands, name, source_entity, component_id, &icon_font.0, &editor_font.0);
+        let (display_entity, body_entity) = spawn_component_display(
+            &mut commands,
+            name,
+            source_entity,
+            component_id,
+            &icon_font.0,
+            &editor_font.0,
+        );
         commands
             .entity(display_entity)
             .insert(ChildOf(group_container));
@@ -242,11 +254,7 @@ pub(crate) fn add_component_displays(
             // Priority 3b: Brush — show face/vertex info
             if type_id == TypeId::of::<crate::brush::Brush>() {
                 if let Some(brush) = reflected.downcast_ref::<crate::brush::Brush>() {
-                    brush_display::spawn_brush_display(
-                        &mut commands,
-                        body_entity,
-                        brush,
-                    );
+                    brush_display::spawn_brush_display(&mut commands, body_entity, brush);
                 }
                 continue;
             }
@@ -291,10 +299,13 @@ pub(crate) fn add_component_displays(
 
     commands.spawn((
         AddComponentButton,
-        bevy::feathers::controls::button(bevy::feathers::controls::ButtonProps::default(), (), Spawn(Text::new("+"))),
+        bevy::feathers::controls::button(
+            bevy::feathers::controls::ButtonProps::default(),
+            (),
+            Spawn(Text::new("+")),
+        ),
         ChildOf(*inspector),
     ));
-
 }
 
 pub(crate) fn remove_component_displays(
@@ -372,10 +383,7 @@ fn spawn_component_display(
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 width: Val::Percent(100.0),
-                padding: UiRect::axes(
-                    Val::Px(tokens::SPACING_SM),
-                    Val::Px(tokens::SPACING_XS),
-                ),
+                padding: UiRect::axes(Val::Px(tokens::SPACING_SM), Val::Px(tokens::SPACING_XS)),
                 column_gap: Val::Px(tokens::SPACING_SM),
                 ..Default::default()
             },
@@ -425,11 +433,11 @@ fn spawn_component_display(
 
     // Toggle on click (on toggle area, not on the X button)
     let section = section_entity;
-    commands.entity(toggle_area).observe(
-        move |_: On<Pointer<Click>>, mut commands: Commands| {
+    commands
+        .entity(toggle_area)
+        .observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
             commands.trigger(ToggleCollapsible { entity: section });
-        },
-    );
+        });
 
     // Remove component button (X icon)
     commands.spawn((
@@ -448,16 +456,14 @@ fn spawn_component_display(
 
     // Hover effect on header
     commands.entity(header).observe(
-        |hover: On<Pointer<Over>>,
-         mut bg: Query<&mut BackgroundColor, With<CollapsibleHeader>>| {
+        |hover: On<Pointer<Over>>, mut bg: Query<&mut BackgroundColor, With<CollapsibleHeader>>| {
             if let Ok(mut bg) = bg.get_mut(hover.event_target()) {
                 bg.0 = tokens::HOVER_BG;
             }
         },
     );
     commands.entity(header).observe(
-        |out: On<Pointer<Out>>,
-         mut bg: Query<&mut BackgroundColor, With<CollapsibleHeader>>| {
+        |out: On<Pointer<Out>>, mut bg: Query<&mut BackgroundColor, With<CollapsibleHeader>>| {
             if let Ok(mut bg) = bg.get_mut(out.event_target()) {
                 bg.0 = tokens::PANEL_HEADER_BG;
             }

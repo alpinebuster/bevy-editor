@@ -15,7 +15,7 @@ pub fn list_view() -> impl Bundle {
     )
 }
 
-/// Styled list item row: [index] label + content area + hover effects
+/// Styled list item row: \[index\] label + content area + hover effects
 pub fn list_item(index: usize) -> impl Bundle {
     (
         ListItem { index },
@@ -54,16 +54,14 @@ pub fn list_item(index: usize) -> impl Bundle {
         ],
         // Hover effects
         observe(
-            |hover: On<Pointer<Over>>,
-             mut q: Query<&mut BackgroundColor, With<ListItem>>| {
+            |hover: On<Pointer<Over>>, mut q: Query<&mut BackgroundColor, With<ListItem>>| {
                 if let Ok(mut bg) = q.get_mut(hover.event_target()) {
                     bg.0 = tokens::HOVER_BG;
                 }
             },
         ),
         observe(
-            |out: On<Pointer<Out>>,
-             mut q: Query<&mut BackgroundColor, With<ListItem>>| {
+            |out: On<Pointer<Out>>, mut q: Query<&mut BackgroundColor, With<ListItem>>| {
                 if let Ok(mut bg) = q.get_mut(out.event_target()) {
                     bg.0 = Color::NONE;
                 }
