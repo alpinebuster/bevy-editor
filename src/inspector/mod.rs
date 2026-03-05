@@ -6,7 +6,6 @@ mod material_display;
 mod reflect_fields;
 
 use crate::EditorEntity;
-use crate::selection::Selected;
 use std::any::TypeId;
 
 use bevy::prelude::*;
@@ -113,6 +112,7 @@ impl Plugin for InspectorPlugin {
         app.register_type_data::<Name, ReflectDisplayable>()
             .add_observer(component_display::remove_component_displays)
             .add_observer(component_display::add_component_displays)
+            .add_observer(component_display::on_inspector_dirty)
             .add_observer(component_picker::on_add_component_button_click)
             .add_observer(reflect_fields::on_checkbox_commit)
             .add_observer(reflect_fields::on_text_edit_commit)
@@ -130,6 +130,7 @@ impl Plugin for InspectorPlugin {
                     reflect_fields::refresh_inspector_fields,
                     component_picker::filter_component_picker,
                     brush_display::update_brush_face_properties,
+                    component_display::filter_inspector_components,
                 )
                     .run_if(in_state(crate::AppState::Editor)),
             );
@@ -198,6 +199,22 @@ pub(super) struct ComponentPickerSectionHeader {
     pub(super) group: String,
 }
 
+/// Marker for the search input in the inspector.
+#[derive(Component)]
+pub(super) struct InspectorSearch;
+
+/// Marker for the collapse-all / expand-all toggle button.
+#[derive(Component)]
+pub(super) struct CollapseAllButton;
+
+/// Stores the component short name on a `ComponentDisplay` for search filtering.
+#[derive(Component)]
+pub(super) struct ComponentName(pub(super) String);
+
+/// Marker for a group section (the `CollapsibleSection` that wraps a group header + body).
+#[derive(Component)]
+pub(super) struct InspectorGroupSection;
+
 /// Tracks which inspector field entity maps to which source entity + component + field path.
 #[derive(Component)]
 pub(super) struct FieldBinding {
@@ -250,10 +267,15 @@ pub(super) const AXIS_X_COLOR: Color = Color::srgb(0.8, 0.3, 0.3);
 pub(super) const AXIS_Y_COLOR: Color = Color::srgb(0.3, 0.7, 0.3);
 pub(super) const AXIS_Z_COLOR: Color = Color::srgb(0.3, 0.5, 0.8);
 
-/// Force inspector rebuild by toggling Selected.
+/// Stores the entity currently being inspected.
+#[derive(Component)]
+pub(super) struct InspectorTarget(pub Entity);
+
+/// Marker inserted on a selected entity to signal the inspector needs rebuilding.
+#[derive(Component)]
+pub(super) struct InspectorDirty;
+
+/// Force inspector rebuild by marking the source entity dirty.
 pub(super) fn rebuild_inspector(world: &mut World, source_entity: Entity) {
-    if let Ok(mut ec) = world.get_entity_mut(source_entity) {
-        ec.remove::<Selected>();
-    }
-    world.entity_mut(source_entity).insert(Selected);
+    world.entity_mut(source_entity).insert(InspectorDirty);
 }

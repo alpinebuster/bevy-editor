@@ -4,6 +4,8 @@ use crate::selection::{Selected, Selection};
 use std::any::TypeId;
 use std::collections::{BTreeMap, HashSet};
 
+use super::InspectorDirty;
+
 use bevy::{
     ecs::{
         archetype::Archetype,
@@ -276,11 +278,8 @@ pub(crate) fn on_add_component_button_click(
                             history.undo_stack.push(cmd);
                             history.redo_stack.clear();
 
-                            // Force refresh: toggle Selected to rebuild inspector
-                            if let Ok(mut entity) = world.get_entity_mut(source_entity) {
-                                entity.remove::<Selected>();
-                            }
-                            world.entity_mut(source_entity).insert(Selected);
+                            // Signal the inspector to rebuild
+                            world.entity_mut(source_entity).insert(InspectorDirty);
                         });
                     }),
                     observe(

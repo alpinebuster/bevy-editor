@@ -19,9 +19,15 @@ use jackdaw_widgets::collapsible::{
     CollapsibleBody, CollapsibleHeader, CollapsibleSection, ToggleCollapsible,
 };
 
+use jackdaw_feathers::text_edit::{self, TextEditProps, TextEditValue};
+use std::collections::HashSet;
+
+use bevy_monitors::prelude::{Addition, Monitor, NotifyAdded};
+
 use super::{
-    AddComponentButton, ComponentDisplay, ComponentDisplayBody, ComponentPicker, Inspector,
-    ReflectDisplayable, ReflectEditorMeta, brush_display, custom_props_display,
+    AddComponentButton, CollapseAllButton, ComponentDisplay, ComponentDisplayBody, ComponentName,
+    ComponentPicker, Inspector, InspectorDirty, InspectorGroupSection, InspectorSearch,
+    InspectorTarget, ReflectDisplayable, ReflectEditorMeta, brush_display, custom_props_display,
     extract_module_group, material_display, reflect_fields,
 };
 
@@ -37,7 +43,6 @@ pub(crate) fn add_component_displays(
     icon_font: Res<IconFont>,
     editor_font: Res<EditorFont>,
 ) {
-    // Show inspector for the primary selected entity
     let Some(primary) = selection.primary() else {
         return;
     };
@@ -45,15 +50,47 @@ pub(crate) fn add_component_displays(
         return;
     };
 
-    // First, clear existing displays
-    // (the remove observer handles this when Selected is removed, but for multi-select
-    //  we also need to rebuild when primary changes)
-
     let source_entity = entity_ref.entity();
-
-    // Show multi-selection header when multiple entities are selected
     let sel_count = selection.entities.len();
-    if sel_count > 1 {
+
+    build_inspector_displays(
+        &mut commands,
+        &components,
+        &type_registry,
+        source_entity,
+        archetype,
+        entity_ref,
+        *inspector,
+        sel_count,
+        &names,
+        &icon_font,
+        &editor_font,
+    );
+
+    // Set up monitoring: watch the selected entity for InspectorDirty
+    commands.entity(*inspector).insert((
+        InspectorTarget(primary),
+        Monitor(primary),
+        NotifyAdded::<InspectorDirty>::default(),
+    ));
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_inspector_displays(
+    commands: &mut Commands,
+    components: &Components,
+    type_registry: &Res<AppTypeRegistry>,
+    source_entity: Entity,
+    archetype: &Archetype,
+    entity_ref: EntityRef,
+    inspector_entity: Entity,
+    selection_count: usize,
+    names: &Query<&Name>,
+    icon_font: &IconFont,
+    editor_font: &EditorFont,
+) {
+    // Show multi-selection header when multiple entities are selected
+    if selection_count > 1 {
         commands.spawn((
             ComponentDisplay,
             Node {
@@ -62,10 +99,10 @@ pub(crate) fn add_component_displays(
                 ..Default::default()
             },
             BackgroundColor(tokens::SELECTED_BG),
-            ChildOf(*inspector),
+            ChildOf(inspector_entity),
             children![(
                 Text::new(format!(
-                    "{sel_count} entities selected — edits apply to all"
+                    "{selection_count} entities selected — edits apply to all"
                 )),
                 TextFont {
                     font: editor_font.0.clone(),
@@ -76,6 +113,96 @@ pub(crate) fn add_component_displays(
             )],
         ));
     }
+
+    // Search bar + collapse-all row
+    let search_row = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                width: Val::Percent(100.0),
+                column_gap: Val::Px(tokens::SPACING_SM),
+                padding: UiRect::axes(Val::Px(tokens::SPACING_SM), Val::Px(tokens::SPACING_XS)),
+                ..Default::default()
+            },
+            ComponentDisplay,
+            ChildOf(inspector_entity),
+        ))
+        .id();
+
+    commands.spawn((
+        InspectorSearch,
+        text_edit::text_edit(
+            TextEditProps::default()
+                .with_placeholder("Filter components...")
+                .allow_empty()
+                .grow(),
+        ),
+        ChildOf(search_row),
+    ));
+
+    // Collapse-all / expand-all button
+    let collapse_btn = commands
+        .spawn((
+            CollapseAllButton,
+            Node {
+                padding: UiRect::all(Val::Px(tokens::SPACING_XS)),
+                ..Default::default()
+            },
+            BackgroundColor(Color::NONE),
+            ChildOf(search_row),
+        ))
+        .id();
+
+    commands.spawn((
+        Text::new(String::from(Icon::ChevronsUpDown.unicode())),
+        TextFont {
+            font: icon_font.0.clone(),
+            font_size: tokens::FONT_MD,
+            ..Default::default()
+        },
+        TextColor(tokens::TEXT_SECONDARY),
+        ChildOf(collapse_btn),
+    ));
+
+    commands.entity(collapse_btn).observe(
+        |_: On<Pointer<Click>>,
+         mut sections: Query<(&mut CollapsibleSection, &Children), With<ComponentDisplay>>,
+         mut nodes: Query<&mut Node, With<CollapsibleBody>>| {
+            // If any section is expanded, collapse all; otherwise expand all
+            let any_expanded = sections.iter().any(|(s, _)| !s.collapsed);
+            let target_collapsed = any_expanded;
+
+            for (mut section, children) in &mut sections {
+                section.collapsed = target_collapsed;
+                for child in children.iter() {
+                    if let Ok(mut node) = nodes.get_mut(child) {
+                        node.display = if target_collapsed {
+                            Display::None
+                        } else {
+                            Display::Flex
+                        };
+                    }
+                }
+            }
+        },
+    );
+
+    // Hover effect on collapse button
+    commands.entity(collapse_btn).observe(
+        |hover: On<Pointer<Over>>, mut bg: Query<&mut BackgroundColor>| {
+            if let Ok(mut bg) = bg.get_mut(hover.event_target()) {
+                bg.0 = tokens::HOVER_BG;
+            }
+        },
+    );
+    commands.entity(collapse_btn).observe(
+        |out: On<Pointer<Out>>, mut bg: Query<&mut BackgroundColor>| {
+            if let Ok(mut bg) = bg.get_mut(out.event_target()) {
+                bg.0 = Color::NONE;
+            }
+        },
+    );
 
     let registry = type_registry.read();
 
@@ -135,7 +262,7 @@ pub(crate) fn add_component_displays(
 
     // Group by module and spawn with group headers
     let mut current_group = String::new();
-    let mut group_container = *inspector;
+    let mut group_container = inspector_entity;
 
     for (name, module_group, component_id) in &comp_list {
         // Start a new group section if the module changed
@@ -144,13 +271,14 @@ pub(crate) fn add_component_displays(
             let section = commands
                 .spawn((
                     ComponentDisplay,
+                    InspectorGroupSection,
                     CollapsibleSection { collapsed: false },
                     Node {
                         flex_direction: FlexDirection::Column,
                         width: Val::Percent(100.0),
                         ..Default::default()
                     },
-                    ChildOf(*inspector),
+                    ChildOf(inspector_entity),
                 ))
                 .id();
 
@@ -163,7 +291,7 @@ pub(crate) fn add_component_displays(
                         width: Val::Percent(100.0),
                         padding: UiRect::axes(
                             Val::Px(tokens::SPACING_SM),
-                            Val::Px(tokens::SPACING_XS),
+                            Val::Px(tokens::SPACING_SM),
                         ),
                         column_gap: Val::Px(tokens::SPACING_SM),
                         ..Default::default()
@@ -193,7 +321,7 @@ pub(crate) fn add_component_displays(
                 Text::new(String::from(group_icon.unicode())),
                 TextFont {
                     font: icon_font.0.clone(),
-                    font_size: tokens::FONT_SM,
+                    font_size: tokens::FONT_MD,
                     ..Default::default()
                 },
                 TextColor(icon_color),
@@ -205,8 +333,8 @@ pub(crate) fn add_component_displays(
                 Text::new(module_group.clone()),
                 TextFont {
                     font: editor_font.0.clone(),
-                    font_size: tokens::FONT_SM,
-                    weight: FontWeight::SEMIBOLD,
+                    font_size: tokens::FONT_MD,
+                    weight: FontWeight::BOLD,
                     ..Default::default()
                 },
                 TextColor(tokens::TEXT_SECONDARY),
@@ -219,8 +347,11 @@ pub(crate) fn add_component_displays(
                     Node {
                         flex_direction: FlexDirection::Column,
                         width: Val::Percent(100.0),
+                        border: UiRect::left(Val::Px(1.0)),
+                        margin: UiRect::left(Val::Px(tokens::SPACING_MD)),
                         ..Default::default()
                     },
+                    BorderColor::all(tokens::BORDER_SUBTLE),
                     ChildOf(section),
                 ))
                 .id();
@@ -228,7 +359,7 @@ pub(crate) fn add_component_displays(
 
         let component_id = *component_id;
         let (display_entity, body_entity) = spawn_component_display(
-            &mut commands,
+            commands,
             name,
             source_entity,
             component_id,
@@ -261,7 +392,7 @@ pub(crate) fn add_component_displays(
             // Priority 2: MeshMaterial3d<StandardMaterial> — display material fields
             if type_id == TypeId::of::<MeshMaterial3d<StandardMaterial>>() {
                 material_display::spawn_material_display_deferred(
-                    &mut commands,
+                    commands,
                     body_entity,
                     source_entity,
                 );
@@ -272,7 +403,7 @@ pub(crate) fn add_component_displays(
             if type_id == TypeId::of::<CustomProperties>() {
                 if let Some(cp) = reflected.downcast_ref::<CustomProperties>() {
                     custom_props_display::spawn_custom_properties_display(
-                        &mut commands,
+                        commands,
                         body_entity,
                         source_entity,
                         cp,
@@ -286,7 +417,7 @@ pub(crate) fn add_component_displays(
             // Priority 3b: Brush — show face/vertex info
             if type_id == TypeId::of::<crate::brush::Brush>() {
                 if let Some(brush) = reflected.downcast_ref::<crate::brush::Brush>() {
-                    brush_display::spawn_brush_display(&mut commands, body_entity, brush);
+                    brush_display::spawn_brush_display(commands, body_entity, brush);
                 }
                 continue;
             }
@@ -294,7 +425,7 @@ pub(crate) fn add_component_displays(
             // Priority 3c: Terrain — custom inspector sections
             if type_id == TypeId::of::<jackdaw_jsn::Terrain>() {
                 crate::terrain::inspector::spawn_terrain_inspector_container(
-                    &mut commands,
+                    commands,
                     body_entity,
                 );
                 continue;
@@ -302,15 +433,15 @@ pub(crate) fn add_component_displays(
 
             // Priority 3: Generic reflection display
             reflect_fields::spawn_reflected_fields(
-                &mut commands,
+                commands,
                 body_entity,
                 reflected,
                 0,
                 String::new(),
                 source_entity,
                 type_id,
-                &names,
-                &type_registry,
+                names,
+                type_registry,
                 &editor_font.0,
                 &icon_font.0,
             );
@@ -334,7 +465,7 @@ pub(crate) fn add_component_displays(
         jackdaw_feathers::button::button(
             jackdaw_feathers::button::ButtonProps::new("+ Add Component"),
         ),
-        ChildOf(*inspector),
+        ChildOf(inspector_entity),
     ));
 }
 
@@ -351,7 +482,12 @@ pub(crate) fn remove_component_displays(
         )>,
     >,
 ) {
-    let (_entity, children) = inspector.into_inner();
+    let (entity, children) = inspector.into_inner();
+
+    // Clean up monitoring components
+    commands
+        .entity(entity)
+        .remove::<(InspectorTarget, Monitor, NotifyAdded<InspectorDirty>)>();
 
     let Some(children) = children else {
         return;
@@ -362,6 +498,66 @@ pub(crate) fn remove_component_displays(
             ec.despawn();
         }
     }
+}
+
+/// Handles `Addition<InspectorDirty>` on the Inspector entity: despawn existing
+/// displays and rebuild from the monitored source entity.
+pub(crate) fn on_inspector_dirty(
+    _: On<Addition<InspectorDirty>>,
+    mut commands: Commands,
+    components: &Components,
+    type_registry: Res<AppTypeRegistry>,
+    inspector: Single<(Entity, &InspectorTarget, Option<&Children>), With<Inspector>>,
+    entity_query: Query<(&Archetype, EntityRef), Without<EditorEntity>>,
+    selection: Res<Selection>,
+    names: Query<&Name>,
+    icon_font: Res<IconFont>,
+    editor_font: Res<EditorFont>,
+    displays: Query<
+        Entity,
+        Or<(
+            With<ComponentDisplay>,
+            With<AddComponentButton>,
+            With<ComponentPicker>,
+        )>,
+    >,
+) {
+    let (inspector_entity, target, children) = inspector.into_inner();
+    let source_entity = target.0;
+
+    // Despawn existing display children
+    if let Some(children) = children {
+        for child in displays.iter_many(children.collection()) {
+            if let Ok(mut ec) = commands.get_entity(child) {
+                ec.despawn();
+            }
+        }
+    }
+
+    // Remove InspectorDirty from the source entity
+    if let Ok(mut ec) = commands.get_entity(source_entity) {
+        ec.remove::<InspectorDirty>();
+    }
+
+    // Rebuild
+    let Ok((archetype, entity_ref)) = entity_query.get(source_entity) else {
+        return;
+    };
+    let sel_count = selection.entities.len();
+
+    build_inspector_displays(
+        &mut commands,
+        &components,
+        &type_registry,
+        source_entity,
+        archetype,
+        entity_ref,
+        inspector_entity,
+        sel_count,
+        &names,
+        &icon_font,
+        &editor_font,
+    );
 }
 
 fn spawn_component_display(
@@ -396,6 +592,7 @@ fn spawn_component_display(
     let section_entity = commands
         .spawn((
             ComponentDisplay,
+            ComponentName(name.to_string()),
             CollapsibleSection { collapsed: false },
             Node {
                 flex_direction: FlexDirection::Column,
@@ -453,8 +650,8 @@ fn spawn_component_display(
         Text::new(name.to_string()),
         TextFont {
             font: body_font,
-            font_size: tokens::FONT_MD,
-            weight: FontWeight::SEMIBOLD,
+            font_size: tokens::FONT_SM,
+            weight: FontWeight::MEDIUM,
             ..Default::default()
         },
         TextColor(tokens::TEXT_DISPLAY_COLOR.into()),
@@ -504,4 +701,52 @@ fn spawn_component_display(
     commands.entity(body_entity).insert(ChildOf(section_entity));
 
     (section_entity, body_entity)
+}
+
+/// Filter inspector components based on the search input.
+pub(crate) fn filter_inspector_components(
+    search_query: Query<&TextEditValue, (With<InspectorSearch>, Changed<TextEditValue>)>,
+    components: Query<(Entity, &ComponentName), With<ComponentDisplay>>,
+    groups: Query<(Entity, &Children), With<InspectorGroupSection>>,
+    mut node_query: Query<&mut Node>,
+) {
+    let Ok(search) = search_query.single() else {
+        return;
+    };
+    let filter = search.0.trim().to_lowercase();
+
+    // Track which component entities are visible
+    let mut visible_components: HashSet<Entity> = HashSet::new();
+
+    // Filter individual component displays by name
+    for (entity, comp_name) in &components {
+        let matches = filter.is_empty() || comp_name.0.to_lowercase().contains(&filter);
+
+        if let Ok(mut node) = node_query.get_mut(entity) {
+            node.display = if matches {
+                Display::Flex
+            } else {
+                Display::None
+            };
+        }
+
+        if matches {
+            visible_components.insert(entity);
+        }
+    }
+
+    // Hide group sections where all children are hidden
+    for (group_entity, children) in &groups {
+        let has_visible_child = children
+            .iter()
+            .any(|child| visible_components.contains(&child));
+
+        if let Ok(mut node) = node_query.get_mut(group_entity) {
+            node.display = if filter.is_empty() || has_visible_child {
+                Display::Flex
+            } else {
+                Display::None
+            };
+        }
+    }
 }

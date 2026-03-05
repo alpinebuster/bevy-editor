@@ -31,7 +31,7 @@ pub struct ToggleCollapsible {
 fn toggle_collapsible(
     event: On<ToggleCollapsible>,
     mut sections: Query<(&mut CollapsibleSection, &Children)>,
-    mut visibility: Query<&mut Visibility, With<CollapsibleBody>>,
+    mut nodes: Query<&mut Node, With<CollapsibleBody>>,
 ) {
     let target = event.entity;
     let Ok((mut section, children)) = sections.get_mut(target) else {
@@ -41,11 +41,11 @@ fn toggle_collapsible(
     section.collapsed = !section.collapsed;
 
     for child in children.iter() {
-        if let Ok(mut vis) = visibility.get_mut(child) {
-            *vis = if section.collapsed {
-                Visibility::Hidden
+        if let Ok(mut node) = nodes.get_mut(child) {
+            node.display = if section.collapsed {
+                Display::None
             } else {
-                Visibility::Inherited
+                Display::Flex
             };
         }
     }
