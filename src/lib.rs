@@ -1,5 +1,6 @@
 pub mod alignment_guides;
 pub mod asset_browser;
+pub mod asset_catalog;
 pub mod brush;
 pub mod commands;
 pub mod custom_properties;
@@ -13,7 +14,6 @@ pub mod inspector;
 pub use inspector::{EditorMeta, ReflectEditorMeta};
 pub mod layout;
 pub mod material_browser;
-pub mod material_definition;
 pub mod material_preview;
 pub mod modal_transform;
 pub mod navmesh;
@@ -66,6 +66,12 @@ pub struct BlocksCameraInput;
 #[derive(Component, Default)]
 pub struct EditorHidden;
 
+/// Marker component for entities that should not be included in scene serialization.
+/// Add this to runtime-generated child entities (brush face meshes, terrain chunks, etc.)
+/// that are rebuilt automatically from their parent's component data.
+#[derive(Component, Default)]
+pub struct NonSerializable;
+
 pub struct EditorPlugin;
 
 impl Plugin for EditorPlugin {
@@ -108,6 +114,7 @@ impl Plugin for EditorPlugin {
             ))
             .insert_resource(UiTheme(create_dark_theme()))
             .init_resource::<layout::KeybindHelpPopover>()
+            .init_resource::<asset_catalog::AssetCatalog>()
             .add_systems(
                 OnEnter(AppState::Editor),
                 (spawn_layout, populate_menu).chain(),

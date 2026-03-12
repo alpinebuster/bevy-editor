@@ -651,9 +651,7 @@ fn entity_heiarchy(icon_font: Handle<Font>) -> impl Bundle {
                                     height: px(24.0),
                                     justify_content: JustifyContent::Center,
                                     align_items: AlignItems::Center,
-                                    border_radius: BorderRadius::all(
-                                        px(tokens::BORDER_RADIUS_SM),
-                                    ),
+                                    border_radius: BorderRadius::all(px(tokens::BORDER_RADIUS_SM),),
                                     ..Default::default()
                                 },
                                 children![(
