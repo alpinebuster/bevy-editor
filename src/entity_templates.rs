@@ -159,7 +159,8 @@ pub fn instantiate_template(world: &mut World, path: &str, position: Vec3) {
 
     let parent_path = Path::new(path).parent().unwrap_or(Path::new(""));
     let local_assets = HashMap::new();
-    let (_spawned, roots) = spawn_jsn_entities(world, &jsn_entities, position, parent_path, &local_assets);
+    let (_spawned, roots) =
+        spawn_jsn_entities(world, &jsn_entities, position, parent_path, &local_assets);
     finalize_instantiation(world, &roots);
 }
 
@@ -186,7 +187,8 @@ pub fn instantiate_jsn_prefab(world: &mut World, path: &str, position: Vec3) {
 
     // Spawn entities using the shared JSN loader
     let jsn_entities = &jsn.scene;
-    let (spawned, roots) = spawn_jsn_entities(world, jsn_entities, position, parent_path, &local_assets);
+    let (spawned, roots) =
+        spawn_jsn_entities(world, jsn_entities, position, parent_path, &local_assets);
 
     // Attach JsnPrefab component to root entities
     for &root in &roots {
@@ -219,9 +221,7 @@ fn spawn_jsn_entities(
     for (i, jsn) in jsn_entities.iter().enumerate() {
         let mut entity = world.spawn_empty();
         entity.insert(Name::new(
-            jsn.name
-                .clone()
-                .unwrap_or_else(|| format!("Entity {}", i)),
+            jsn.name.clone().unwrap_or_else(|| format!("Entity {}", i)),
         ));
         if let Some(t) = &jsn.transform {
             entity.insert(Transform::from(t.clone()));

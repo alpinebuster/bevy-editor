@@ -1,7 +1,5 @@
 use crate::EditorEntity;
-use crate::brush::{
-    Brush, BrushEditMode, BrushFaceData, BrushSelection, EditMode, SetBrush,
-};
+use crate::brush::{Brush, BrushEditMode, BrushFaceData, BrushSelection, EditMode, SetBrush};
 use crate::commands::CommandHistory;
 
 use bevy::prelude::*;

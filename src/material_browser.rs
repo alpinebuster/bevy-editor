@@ -183,9 +183,11 @@ fn detect_and_create_materials(
                 "normalgl" | "nor" | "nrm" | "nrml" | "norm" | "bump" | "bmp" | "n" | "normal" => {
                     normal_map_texture = Some(asset_server.load::<Image>(asset_path.clone()));
                 }
-                "orm" | "metallic" | "metalness" | "metal" | "mtl" | "roughness" | "rough" | "rgh" => {
+                "orm" | "metallic" | "metalness" | "metal" | "mtl" | "roughness" | "rough"
+                | "rgh" => {
                     if metallic_roughness_texture.is_none() {
-                        metallic_roughness_texture = Some(asset_server.load::<Image>(asset_path.clone()));
+                        metallic_roughness_texture =
+                            Some(asset_server.load::<Image>(asset_path.clone()));
                     }
                 }
                 "emission" | "emissive" | "emit" => {
@@ -288,7 +290,8 @@ fn scan_material_definitions(
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default().join("assets"));
     state.scan_directory = assets_dir.clone();
 
-    let detected = detect_and_create_materials(&state.scan_directory, &asset_server, &mut materials);
+    let detected =
+        detect_and_create_materials(&state.scan_directory, &asset_server, &mut materials);
     for (name, handle) in detected {
         if registry.get_by_name(&name).is_none() {
             registry.add(name, handle);
@@ -314,7 +317,8 @@ fn rescan_material_definitions(
 
     registry.entries.clear();
 
-    let detected = detect_and_create_materials(&state.scan_directory, &asset_server, &mut materials);
+    let detected =
+        detect_and_create_materials(&state.scan_directory, &asset_server, &mut materials);
     for (name, handle) in detected {
         registry.add(name, handle);
     }

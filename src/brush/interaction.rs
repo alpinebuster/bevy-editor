@@ -524,10 +524,7 @@ fn spawn_extruded_brush(
         };
 
         // Apply last-used material
-        let last_mat = world
-            .resource::<super::LastUsedMaterial>()
-            .material
-            .clone();
+        let last_mat = world.resource::<super::LastUsedMaterial>().material.clone();
         if let Some(ref mat) = last_mat {
             for face in &mut brush.faces {
                 face.material = mat.clone();

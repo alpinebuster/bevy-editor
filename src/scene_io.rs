@@ -7,9 +7,7 @@ use std::path::{Path, PathBuf};
 use std::result::Result;
 
 use bevy::asset::{ReflectAsset, ReflectHandle, UntypedAssetId};
-use bevy::reflect::serde::{
-    ReflectDeserializerProcessor, ReflectSerializerProcessor,
-};
+use bevy::reflect::serde::{ReflectDeserializerProcessor, ReflectSerializerProcessor};
 use bevy::reflect::{TypeRegistration, TypeRegistry};
 use bevy::{
     asset::AssetPath,
@@ -175,7 +173,13 @@ fn save_scene_inner(world: &mut World) {
         collect_inline_assets(world, &registry_guard, &parent_path, &scene_entities);
 
     // --- Phase 2: Build entity list and serialize ---
-    let entities = build_scene_snapshot(world, &registry_guard, &parent_path, &inline_assets, &scene_entities);
+    let entities = build_scene_snapshot(
+        world,
+        &registry_guard,
+        &parent_path,
+        &inline_assets,
+        &scene_entities,
+    );
 
     // --- Phase 3: Serialize inline asset data into JsnAssets ---
     let assets = JsnAssets(inline_asset_data);
@@ -419,9 +423,7 @@ impl<'a> ReflectDeserializerProcessor for JsnDeserializerProcessor<'a> {
                 Ok(s) => s,
                 Err(_) => {
                     // Not a valid index, return placeholder
-                    return Ok(Ok(
-                        Box::new(Entity::PLACEHOLDER).into_partial_reflect()
-                    ));
+                    return Ok(Ok(Box::new(Entity::PLACEHOLDER).into_partial_reflect()));
                 }
             };
             let idx: usize = idx_str.parse().unwrap_or(usize::MAX);
@@ -872,7 +874,6 @@ fn build_scene_snapshot(
     inline_assets: &HashMap<UntypedAssetId, String>,
     entities: &[Entity],
 ) -> Vec<JsnEntity> {
-
     // Build entity → index map for parent and entity-field references
     let entity_to_index: HashMap<Entity, usize> =
         entities.iter().enumerate().map(|(i, &e)| (e, i)).collect();
@@ -1065,7 +1066,9 @@ pub fn load_inline_assets(
                 warn!(
                     "External asset entry '{name}' has unknown type '{type_path}' — loading untyped"
                 );
-                asset_server.load::<bevy::asset::LoadedUntypedAsset>(&path_str).untyped()
+                asset_server
+                    .load::<bevy::asset::LoadedUntypedAsset>(&path_str)
+                    .untyped()
             };
             local_assets.insert(name.clone(), handle);
         }
@@ -1096,8 +1099,11 @@ pub fn load_inline_assets(
                 entity_map: &[],
             };
 
-            let deserializer =
-                TypedReflectDeserializer::with_processor(registration, &registry_guard, &mut deser_processor);
+            let deserializer = TypedReflectDeserializer::with_processor(
+                registration,
+                &registry_guard,
+                &mut deser_processor,
+            );
             let Ok(reflected) = deserializer.deserialize(json_value) else {
                 warn!("Failed to deserialize inline asset '{name}' of type '{type_path}'");
                 continue;
@@ -1127,9 +1133,7 @@ pub fn load_scene_from_jsn(
     for (i, jsn) in entities.iter().enumerate() {
         let mut entity = world.spawn_empty();
         entity.insert(Name::new(
-            jsn.name
-                .clone()
-                .unwrap_or_else(|| format!("Entity {}", i)),
+            jsn.name.clone().unwrap_or_else(|| format!("Entity {}", i)),
         ));
         if let Some(t) = &jsn.transform {
             entity.insert(Transform::from(t.clone()));
@@ -1272,7 +1276,10 @@ fn collect_editor_entities(world: &mut World) -> HashSet<Entity> {
 fn clear_scene_entities(world: &mut World) {
     // Clear selection first to prevent on_entity_deselected observer from
     // firing on stale/despawned tree row entities.
-    world.resource_mut::<crate::selection::Selection>().entities.clear();
+    world
+        .resource_mut::<crate::selection::Selection>()
+        .entities
+        .clear();
 
     // Clear hierarchy tree rows and TreeIndex before despawning scene entities.
     crate::hierarchy::clear_all_tree_rows(world);

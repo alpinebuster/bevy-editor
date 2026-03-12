@@ -116,7 +116,6 @@ impl Plugin for BrushPlugin {
             .init_resource::<EditMode>()
             .init_resource::<BrushSelection>()
             .init_resource::<BrushMaterialPalette>()
-
             .init_resource::<BrushDragState>()
             .init_resource::<VertexDragState>()
             .init_resource::<EdgeDragState>()

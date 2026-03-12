@@ -233,10 +233,7 @@ fn swap_face_materials(
         if face_data.material != Handle::default() {
             continue;
         }
-        let mat = target_materials
-            .first()
-            .cloned()
-            .unwrap_or_default();
+        let mat = target_materials.first().cloned().unwrap_or_default();
         commands.entity(face_entity).insert(MeshMaterial3d(mat));
     }
 }

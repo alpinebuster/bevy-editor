@@ -164,7 +164,6 @@ struct PreviewPanelContainer;
 #[derive(Resource)]
 struct AssetBrowserFolderTask(Task<Option<rfd::FileHandle>>);
 
-
 // ── Helpers (absorbed from texture_browser) ─────────────────────────────────
 
 fn is_image_file_path(path: &Path) -> bool {
@@ -196,7 +195,6 @@ fn read_ktx2_info(path: &Path) -> (u32, u32) {
     let face_count = u32::from_le_bytes([header[36], header[37], header[38], header[39]]);
     (layer_count, face_count)
 }
-
 
 // ── Systems ─────────────────────────────────────────────────────────────────
 

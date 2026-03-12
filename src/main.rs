@@ -1,4 +1,8 @@
-use bevy::{asset::{AssetPlugin, UnapprovedPathMode}, light::GlobalAmbientLight, prelude::*};
+use bevy::{
+    asset::{AssetPlugin, UnapprovedPathMode},
+    light::GlobalAmbientLight,
+    prelude::*,
+};
 use jackdaw::EditorPlugin;
 
 fn main() -> AppExit {

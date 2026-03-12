@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
+use crate::EditorEntity;
 use bevy::{picking::hover::Hovered, prelude::*, ui_widgets::observe};
 use jackdaw_feathers::{
     icons::Icon,
     text_edit::{self, TextEditProps, TextEditValue},
     tokens,
 };
-use crate::EditorEntity;
 
 pub struct PrefabPickerPlugin;
 
