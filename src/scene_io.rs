@@ -615,7 +615,7 @@ fn collect_inline_assets(
     (id_to_name, asset_data)
 }
 
-/// Recursively walk a reflected value looking for Handle<T> fields that are runtime-created.
+/// Recursively walk a reflected value looking for `Handle<T>` fields that are runtime-created.
 fn collect_handles_from_reflect(
     value: &dyn PartialReflect,
     registry: &TypeRegistry,
