@@ -227,7 +227,7 @@ impl SceneJsnAst {
 // named fields to array indices when the JSON value is an array (e.g., Vec3
 // serializes as [x, y, z] but reflection paths use `translation.x`).
 
-use bevy::reflect::{TypeInfo, TypeRegistration};
+use bevy::reflect::{EnumInfo, TypeInfo, TypeRegistration, VariantInfo};
 
 /// Resolve a field name to an array index using type info.
 /// Returns `None` if the type doesn't have named fields or the name isn't found.
@@ -237,6 +237,57 @@ fn field_index_from_type_info(type_info: &TypeInfo, field_name: &str) -> Option<
         TypeInfo::TupleStruct(_) => field_name.parse::<usize>().ok(),
         _ => None,
     }
+}
+
+/// Given a JSON value representing an enum in Bevy's reflect serialization
+/// format (`{"VariantName": inner}` for struct/tuple, `"VariantName"` for
+/// unit), return the variant name and a reference to the inner JSON.
+///
+/// For unit variants the "inner" is the string itself — callers must check
+/// the variant kind via `EnumInfo` before descending further.
+fn enum_variant_from_json(json: &serde_json::Value) -> Option<(&str, &serde_json::Value)> {
+    match json {
+        serde_json::Value::Object(map) if map.len() == 1 => {
+            let (name, inner) = map.iter().next()?;
+            Some((name.as_str(), inner))
+        }
+        serde_json::Value::String(name) => Some((name.as_str(), json)),
+        _ => None,
+    }
+}
+
+fn enum_variant_from_json_mut(
+    json: &mut serde_json::Value,
+) -> Option<(String, &mut serde_json::Value)> {
+    match json {
+        serde_json::Value::Object(map) if map.len() == 1 => {
+            let name = map.keys().next().cloned()?;
+            let inner = map.get_mut(&name)?;
+            Some((name, inner))
+        }
+        _ => None,
+    }
+}
+
+/// Find a field on the current variant by name (or index for tuple variants)
+/// and return its TypeRegistration. Used to advance `current_reg` after an
+/// enum has been unwrapped during path navigation.
+fn variant_field_type_registration<'a>(
+    enum_info: &EnumInfo,
+    variant_name: &str,
+    field_name: &str,
+    registry: &'a TypeRegistry,
+) -> Option<&'a TypeRegistration> {
+    let variant = enum_info.variant(variant_name)?;
+    let field_type_id = match variant {
+        VariantInfo::Struct(s) => s.field(field_name).map(|f| f.type_id())?,
+        VariantInfo::Tuple(t) => {
+            let idx: usize = field_name.parse().ok()?;
+            t.field_at(idx).map(|f| f.type_id())?
+        }
+        VariantInfo::Unit(_) => return None,
+    };
+    registry.get(field_type_id)
 }
 
 /// Get the TypeRegistration for a field by name, advancing through the type tree.
@@ -273,6 +324,27 @@ fn typed_json_path_get<'a>(
 
     for segment in path.split('.').filter(|s| !s.is_empty()) {
         let type_info = current_reg.type_info();
+
+        // Auto-unwrap enums: Bevy's reflect-path for `ColliderConstructor::Sphere`
+        // treats `"radius"` as a field of the *current variant*, not a sibling of
+        // the variant tag. Mirror that by descending into the variant's inner
+        // JSON object before consuming the segment.
+        if let TypeInfo::Enum(enum_info) = type_info {
+            let (variant_name, inner) = enum_variant_from_json(current)?;
+            let next_reg =
+                variant_field_type_registration(enum_info, variant_name, segment, registry)?;
+            let next_val = match inner {
+                serde_json::Value::Object(_) => inner.get(segment)?,
+                serde_json::Value::Array(_) => {
+                    let idx: usize = segment.parse().ok()?;
+                    inner.get(idx)?
+                }
+                _ => return None,
+            };
+            current = next_val;
+            current_reg = next_reg;
+            continue;
+        }
 
         // Handle bracket indexing (e.g., "faces[0]")
         if let Some(bracket_pos) = segment.find('[') {
@@ -350,6 +422,51 @@ fn typed_json_path_set(
     for (i, segment) in segments.iter().enumerate() {
         let is_last = i == segments.len() - 1;
         let type_info = current_reg.type_info();
+
+        // Auto-unwrap enums: descend into the variant's inner value so paths
+        // like `"radius"` address the field on the current variant rather
+        // than inserting a sibling of the variant tag.
+        if let TypeInfo::Enum(enum_info) = type_info {
+            let (variant_name, inner) = match enum_variant_from_json_mut(current) {
+                Some(v) => v,
+                None => return,
+            };
+            let Some(next_reg) =
+                variant_field_type_registration(enum_info, &variant_name, segment, registry)
+            else {
+                return;
+            };
+            if is_last {
+                // Set the field inside the variant's inner value.
+                match inner {
+                    serde_json::Value::Object(map) => {
+                        map.insert(segment.to_string(), value);
+                    }
+                    serde_json::Value::Array(arr) => {
+                        if let Ok(idx) = segment.parse::<usize>()
+                            && idx < arr.len()
+                        {
+                            arr[idx] = value;
+                        }
+                    }
+                    _ => {}
+                }
+                return;
+            }
+            // Descend into the variant's field and continue.
+            let field_val = match inner {
+                serde_json::Value::Object(map) => map.get_mut(*segment),
+                serde_json::Value::Array(arr) => match segment.parse::<usize>() {
+                    Ok(idx) => arr.get_mut(idx),
+                    Err(_) => return,
+                },
+                _ => None,
+            };
+            let Some(next) = field_val else { return };
+            current = next;
+            current_reg = next_reg;
+            continue;
+        }
 
         if let Some(bracket_pos) = segment.find('[') {
             let key = &segment[..bracket_pos];
