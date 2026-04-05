@@ -1722,8 +1722,8 @@ fn handle_scene_io_keys(world: &mut World) {
 
 /// Register a single ECS entity in the SceneJsnAst by serializing all its
 /// scene-relevant components into JSON. Skips entities already in the AST.
-/// Serializer processor for AST registration — resolves Handle<T> to path strings
-/// and Entity to null (no scene-local index available at registration time).
+/// Serializer processor for AST registration — resolves `Handle<T>` to path strings
+/// and `Entity` to null (no scene-local index available at registration time).
 /// Matches BSN's `BsnValue::from_reflect_with_assets` pattern.
 pub struct AstSerializerProcessor;
 
