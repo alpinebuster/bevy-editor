@@ -129,6 +129,7 @@ impl Plugin for InspectorPlugin {
                 Update,
                 (
                     reflect_fields::refresh_inspector_fields,
+                    reflect_fields::refresh_enum_variants,
                     component_picker::filter_component_picker,
                     brush_display::update_brush_face_properties,
                     component_display::filter_inspector_components,
@@ -222,6 +223,18 @@ pub(super) struct FieldBinding {
     pub(super) source_entity: Entity,
     pub(super) type_path: String,
     pub(super) field_path: String,
+}
+
+/// Marker on the container that holds an enum combobox + its current variant's
+/// field rows. `refresh_enum_variants` polls these and rebuilds the subtree
+/// (combobox + field rows) in place whenever the ECS variant changes.
+#[derive(Component)]
+pub(super) struct EnumVariantHost {
+    pub(super) source_entity: Entity,
+    pub(super) type_path: String,
+    pub(super) field_path: String,
+    pub(super) depth: usize,
+    pub(super) current_variant: String,
 }
 
 /// Container for brush face properties (texture, UV, etc). Populated dynamically.

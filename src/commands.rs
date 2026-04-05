@@ -543,13 +543,19 @@ fn apply_jsn_field_to_ecs(
             return;
         };
         if let Ok(field) = reflected.into_inner().reflect_path_mut(field_path) {
-            apply_json_to_reflect(field, value);
+            apply_json_to_reflect(field, value, &registry);
         }
     }
 }
 
 /// Convert a serde_json::Value into the matching reflect primitive and apply it.
-fn apply_json_to_reflect(field: &mut dyn bevy::reflect::PartialReflect, value: &serde_json::Value) {
+/// Falls back to Bevy's typed deserialization for complex types (enums, structs)
+/// that can't be handled by simple primitive downcasts.
+fn apply_json_to_reflect(
+    field: &mut dyn bevy::reflect::PartialReflect,
+    value: &serde_json::Value,
+    registry: &bevy::reflect::TypeRegistry,
+) {
     match value {
         serde_json::Value::Number(n) => {
             if let Some(f) = field.try_downcast_mut::<f32>() {
@@ -584,9 +590,36 @@ fn apply_json_to_reflect(field: &mut dyn bevy::reflect::PartialReflect, value: &
         serde_json::Value::String(s) => {
             if let Some(f) = field.try_downcast_mut::<String>() {
                 *f = s.clone();
+                return;
             }
+            // Unit enum variants serialize as a bare string — fall through to the
+            // typed-deserializer path below.
+            try_typed_deserialize(field, value, registry);
         }
-        _ => {}
+        serde_json::Value::Object(_) | serde_json::Value::Array(_) => {
+            // Structs, tuple structs, enum struct/tuple variants, lists, etc.
+            try_typed_deserialize(field, value, registry);
+        }
+        serde_json::Value::Null => {}
+    }
+}
+
+/// Look up the field's TypeRegistration via its represented type info and run
+/// `TypedReflectDeserializer` on the JSON, then apply the result.
+fn try_typed_deserialize(
+    field: &mut dyn bevy::reflect::PartialReflect,
+    value: &serde_json::Value,
+    registry: &bevy::reflect::TypeRegistry,
+) {
+    let Some(type_info) = field.get_represented_type_info() else {
+        return;
+    };
+    let Some(registration) = registry.get(type_info.type_id()) else {
+        return;
+    };
+    let deserializer = bevy::reflect::serde::TypedReflectDeserializer::new(registration, registry);
+    if let Ok(reflected) = deserializer.deserialize(value) {
+        field.apply(reflected.as_ref());
     }
 }
 

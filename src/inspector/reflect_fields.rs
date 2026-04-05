@@ -1729,6 +1729,83 @@ pub(crate) fn refresh_inspector_fields(world: &mut World) {
     }
 }
 
+/// HACK: polling-based enum-variant refresh. Compares each `EnumVariantHost`'s
+/// stored variant name against the ECS value via reflection every frame, and
+/// rebuilds the subtree (combobox + field rows) in place when they differ.
+///
+/// This covers all update sources uniformly (user click, undo/redo, external
+/// edits) via a single ECS-mismatch trigger, but the per-frame poll is wasteful
+/// and also races slightly with user interaction. Replace with proper observer-
+/// based reactivity (component change hooks / mutation events) once the
+/// underlying AST sync fires observable events we can subscribe to.
+pub(crate) fn refresh_enum_variants(
+    mut commands: Commands,
+    selection: Res<Selection>,
+    type_registry: Res<AppTypeRegistry>,
+    entity_names: Query<&Name>,
+    editor_font: Res<jackdaw_feathers::icons::EditorFont>,
+    icon_font: Res<jackdaw_feathers::icons::IconFont>,
+    mut hosts: Query<(Entity, &mut super::EnumVariantHost, &Children)>,
+    // `Without<EnumVariantHost>` makes this query disjoint from `hosts` so the
+    // two queries can coexist — we only ever need to read the selected source
+    // entity, never a UI container.
+    entity_query: Query<bevy::ecs::world::EntityRef, Without<super::EnumVariantHost>>,
+) {
+    let Some(primary) = selection.primary() else { return };
+    let registry_guard = type_registry.read();
+    let Ok(entity_ref) = entity_query.get(primary) else { return };
+
+    for (container, mut host, children) in &mut hosts {
+        if host.source_entity != primary {
+            continue;
+        }
+
+        // Resolve the enum via reflection
+        let Some(registration) = registry_guard.get_with_type_path(host.type_path.as_str()) else {
+            continue;
+        };
+        let Some(reflect_component) = registration.data::<ReflectComponent>() else {
+            continue;
+        };
+        let Some(reflected) = reflect_component.reflect(entity_ref) else {
+            continue;
+        };
+
+        let enum_partial: &dyn bevy::reflect::PartialReflect = if host.field_path.is_empty() {
+            reflected.as_partial_reflect()
+        } else {
+            let Ok(field) = reflected.reflect_path(host.field_path.as_str()) else {
+                continue;
+            };
+            field
+        };
+
+        let ReflectRef::Enum(e) = enum_partial.reflect_ref() else { continue };
+        if e.variant_name() == host.current_variant {
+            continue;
+        }
+
+        // Despawn the old children (combobox + field rows) and repopulate
+        for child in children.iter() {
+            commands.entity(child).despawn();
+        }
+
+        let new_variant = e.variant_name().to_string();
+        spawn_variant_contents(
+            &mut commands,
+            container,
+            &host,
+            e,
+            &entity_names,
+            &type_registry,
+            &editor_font.0,
+            &icon_font.0,
+        );
+
+        host.current_variant = new_variant;
+    }
+}
+
 /// Walk from an outer text_edit entity to find the wrapper and inner EditorTextEdit entities.
 /// Returns (wrapper_entity, inner_entity).
 fn find_text_edit_entities(world: &World, outer_entity: Entity) -> Option<(Entity, Entity)> {
@@ -1899,7 +1976,9 @@ fn spawn_enum_field(
                 },
             );
     } else {
-        // Show ComboBox for variant selection + recurse into fields for data-carrying variants
+        // Container + combobox + field rows. Tagged with `EnumVariantHost` so
+        // `refresh_enum_variants` can swap in new field rows when the ECS variant
+        // changes (user click, undo, redo, external edit).
         let container = commands
             .spawn((
                 Node {
@@ -1913,67 +1992,117 @@ fn spawn_enum_field(
             ))
             .id();
 
-        let path = field_path.clone();
-        let tp = type_path.to_string();
-        commands
-            .spawn((
-                combobox_with_selected(variant_names, selected_index),
-                FieldBinding {
-                    source_entity,
-                    type_path: type_path.to_string(),
-                    field_path: field_path.clone(),
-                },
-                ChildOf(container),
-            ))
-            .observe(
-                move |event: On<ComboBoxChangeEvent>, mut commands: Commands| {
-                    let variant_name = event.label.clone();
-                    let path = path.clone();
-                    let tp = tp.clone();
-                    commands.queue(move |world: &mut World| {
-                        apply_enum_variant_with_undo(
-                            world,
-                            source_entity,
-                            &tp,
-                            &path,
-                            &variant_name,
-                        );
-                    });
-                },
-            );
+        let host = super::EnumVariantHost {
+            source_entity,
+            type_path: type_path.to_string(),
+            field_path: field_path.clone(),
+            depth,
+            current_variant: enum_ref.variant_name().to_string(),
+        };
+        spawn_variant_contents(
+            commands,
+            container,
+            &host,
+            enum_ref,
+            entity_names,
+            type_registry,
+            editor_font,
+            icon_font,
+        );
+        commands.entity(container).insert(host);
+    }
+}
 
-        // Recurse into current variant's fields (if it has any)
-        let variant_field_count = enum_ref.field_len();
-        if variant_field_count > 0 {
-            for i in 0..variant_field_count {
-                let Some(field_value) = enum_ref.field_at(i) else {
-                    continue;
-                };
-                let field_name = enum_ref
-                    .name_at(i)
-                    .map(|n| n.to_string())
-                    .unwrap_or_else(|| format!("{i}"));
-                let child_path = if field_path.is_empty() {
-                    field_name.clone()
-                } else {
-                    format!("{field_path}.{field_name}")
-                };
-                spawn_field_row(
-                    commands,
-                    container,
-                    &field_name,
-                    field_value,
-                    depth + 1,
-                    child_path,
-                    source_entity,
-                    type_path,
-                    entity_names,
-                    type_registry,
-                    editor_font,
-                    icon_font,
-                );
-            }
-        }
+/// Spawn the combobox + current-variant field rows as children of `container`.
+/// Called both on initial UI build and from `refresh_enum_variants` after
+/// despawning the old children. `host` bundles `source_entity`, `type_path`,
+/// `field_path`, `depth` so those four don't appear as separate arguments.
+pub(super) fn spawn_variant_contents(
+    commands: &mut Commands,
+    container: Entity,
+    host: &super::EnumVariantHost,
+    enum_ref: &dyn bevy::reflect::Enum,
+    entity_names: &Query<&Name>,
+    type_registry: &AppTypeRegistry,
+    editor_font: &Handle<Font>,
+    icon_font: &Handle<Font>,
+) {
+    // Variant names + current selected index come straight from reflect.
+    let Some(type_info) = enum_ref.get_represented_type_info() else { return };
+    let bevy::reflect::TypeInfo::Enum(enum_info) = type_info else { return };
+
+    let variant_names: Vec<String> = enum_info
+        .variant_names()
+        .iter()
+        .map(|n| n.to_string())
+        .collect();
+    if variant_names.is_empty() {
+        return;
+    }
+    let current_variant = enum_ref.variant_name();
+    let selected_index = variant_names
+        .iter()
+        .position(|n| n == current_variant)
+        .unwrap_or(0);
+
+    // Combobox with change observer
+    let field_path_for_observer = host.field_path.clone();
+    let type_path_for_observer = host.type_path.clone();
+    let source_entity = host.source_entity;
+    commands
+        .spawn((
+            combobox_with_selected(variant_names, selected_index),
+            FieldBinding {
+                source_entity,
+                type_path: host.type_path.clone(),
+                field_path: host.field_path.clone(),
+            },
+            ChildOf(container),
+        ))
+        .observe(
+            move |event: On<ComboBoxChangeEvent>, mut commands: Commands| {
+                let variant_name = event.label.clone();
+                let path = field_path_for_observer.clone();
+                let tp = type_path_for_observer.clone();
+                commands.queue(move |world: &mut World| {
+                    apply_enum_variant_with_undo(
+                        world,
+                        source_entity,
+                        &tp,
+                        &path,
+                        &variant_name,
+                    );
+                });
+            },
+        );
+
+    // Spawn a row for each field of the current variant
+    let variant_field_count = enum_ref.field_len();
+    for i in 0..variant_field_count {
+        let Some(field_value) = enum_ref.field_at(i) else { continue };
+        let field_name = enum_ref
+            .name_at(i)
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| format!("{i}"));
+        let child_path = if host.field_path.is_empty() {
+            field_name.clone()
+        } else {
+            format!("{}.{}", host.field_path, field_name)
+        };
+        spawn_field_row(
+            commands,
+            container,
+            &field_name,
+            field_value,
+            host.depth + 1,
+            child_path,
+            host.source_entity,
+            &host.type_path,
+            entity_names,
+            type_registry,
+            editor_font,
+            icon_font,
+        );
     }
 }
 
@@ -1990,9 +2119,16 @@ fn apply_enum_variant_with_undo(
     let selection = world.resource::<Selection>();
     let targets: Vec<Entity> = selection.entities.clone();
 
-    let new_json = serde_json::Value::String(variant_name.to_string());
-
     let reg = registry.read();
+
+    // Build JSON that the TypedReflectDeserializer can round-trip. A bare
+    // variant-name string only works for *unit* variants; struct/tuple variants
+    // need `{"VariantName": {fields}}` / `{"VariantName": [items]}` with the
+    // fields populated from each field type's `ReflectDefault`.
+    let new_json = resolve_enum_info(type_path, field_path, &reg)
+        .and_then(|enum_info| build_variant_default_json(enum_info, variant_name, &reg))
+        .unwrap_or_else(|| serde_json::Value::String(variant_name.to_string()));
+
     let mut sub_commands: Vec<Box<dyn EditorCommand>> = Vec::new();
 
     for &target in &targets {
@@ -2028,4 +2164,89 @@ fn apply_enum_variant_with_undo(
     let mut history = world.resource_mut::<CommandHistory>();
     history.undo_stack.push(cmd);
     history.redo_stack.clear();
+    // No need to flag anything — `refresh_enum_variants` detects the ECS
+    // variant change and rebuilds the affected subtree automatically. Same
+    // goes for undo/redo since the command framework mutates the ECS too.
+}
+
+/// Walk from a component type through a dotted field path to find the enum `TypeInfo`
+/// at that location. Returns `None` if the path doesn't terminate on an enum.
+fn resolve_enum_info<'a>(
+    type_path: &str,
+    field_path: &str,
+    registry: &'a bevy::reflect::TypeRegistry,
+) -> Option<&'a bevy::reflect::EnumInfo> {
+    use bevy::reflect::TypeInfo;
+
+    let mut current_reg = registry.get_with_type_path(type_path)?;
+    let mut current_info = current_reg.type_info();
+
+    for segment in field_path.split('.').filter(|s| !s.is_empty()) {
+        let field_type_id = match current_info {
+            TypeInfo::Struct(s) => s.field(segment).map(|f| f.type_id())?,
+            TypeInfo::TupleStruct(ts) => {
+                let idx: usize = segment.parse().ok()?;
+                ts.field_at(idx).map(|f| f.type_id())?
+            }
+            _ => return None,
+        };
+        current_reg = registry.get(field_type_id)?;
+        current_info = current_reg.type_info();
+    }
+
+    if let TypeInfo::Enum(enum_info) = current_info {
+        Some(enum_info)
+    } else {
+        None
+    }
+}
+
+/// Build JSON in Bevy's reflect-serialization format for a freshly-constructed
+/// default of the named enum variant. Returns `None` if any field type lacks
+/// `ReflectDefault`.
+fn build_variant_default_json(
+    enum_info: &bevy::reflect::EnumInfo,
+    variant_name: &str,
+    registry: &bevy::reflect::TypeRegistry,
+) -> Option<serde_json::Value> {
+    use bevy::reflect::{
+        VariantInfo,
+        prelude::ReflectDefault,
+        serde::TypedReflectSerializer,
+    };
+
+    let variant = enum_info.variant(variant_name)?;
+
+    match variant {
+        VariantInfo::Unit(_) => Some(serde_json::Value::String(variant_name.to_string())),
+        VariantInfo::Struct(struct_info) => {
+            let mut fields = serde_json::Map::new();
+            for i in 0..struct_info.field_len() {
+                let field = struct_info.field_at(i)?;
+                let field_reg = registry.get(field.type_id())?;
+                let default = field_reg.data::<ReflectDefault>()?.default();
+                let serializer =
+                    TypedReflectSerializer::new(default.as_ref().as_partial_reflect(), registry);
+                let value = serde_json::to_value(&serializer).ok()?;
+                fields.insert(field.name().to_string(), value);
+            }
+            let mut outer = serde_json::Map::new();
+            outer.insert(variant_name.to_string(), serde_json::Value::Object(fields));
+            Some(serde_json::Value::Object(outer))
+        }
+        VariantInfo::Tuple(tuple_info) => {
+            let mut values = Vec::with_capacity(tuple_info.field_len());
+            for i in 0..tuple_info.field_len() {
+                let field = tuple_info.field_at(i)?;
+                let field_reg = registry.get(field.type_id())?;
+                let default = field_reg.data::<ReflectDefault>()?.default();
+                let serializer =
+                    TypedReflectSerializer::new(default.as_ref().as_partial_reflect(), registry);
+                values.push(serde_json::to_value(&serializer).ok()?);
+            }
+            let mut outer = serde_json::Map::new();
+            outer.insert(variant_name.to_string(), serde_json::Value::Array(values));
+            Some(serde_json::Value::Object(outer))
+        }
+    }
 }

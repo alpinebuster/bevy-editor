@@ -20,6 +20,7 @@ pub mod material_browser;
 pub mod material_preview;
 pub mod modal_transform;
 pub mod navmesh;
+pub mod physics_brush_bridge;
 pub mod prefab_picker;
 pub mod project;
 pub mod project_select;
@@ -132,6 +133,10 @@ impl Plugin for EditorPlugin {
                 prefab_picker::PrefabPickerPlugin,
                 remote::RemoteConnectionPlugin,
             ))
+            .add_plugins(
+                jackdaw_avian_integration::PhysicsOverlaysPlugin::<selection::Selected>::new(),
+            )
+            .add_plugins(physics_brush_bridge::PhysicsBrushBridgePlugin)
             .configure_sets(
                 Update,
                 EditorInteraction
@@ -264,6 +269,8 @@ fn populate_menu(world: &mut World) {
                     ("view.face_grid", "Toggle Face Grid"),
                     ("view.brush_wireframe", "Toggle Brush Wireframe"),
                     ("view.alignment_guides", "Toggle Alignment Guides"),
+                    ("view.collider_gizmos", "Toggle Collider Gizmos"),
+                    ("view.hierarchy_arrows", "Toggle Hierarchy Arrows"),
                 ],
             ),
             (
@@ -469,6 +476,20 @@ fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
             commands.queue(|world: &mut World| {
                 let mut settings = world.resource_mut::<viewport_overlays::OverlaySettings>();
                 settings.show_alignment_guides = !settings.show_alignment_guides;
+            });
+        }
+        "view.collider_gizmos" => {
+            commands.queue(|world: &mut World| {
+                let mut config = world
+                    .resource_mut::<jackdaw_avian_integration::PhysicsOverlayConfig>();
+                config.show_colliders = !config.show_colliders;
+            });
+        }
+        "view.hierarchy_arrows" => {
+            commands.queue(|world: &mut World| {
+                let mut config = world
+                    .resource_mut::<jackdaw_avian_integration::PhysicsOverlayConfig>();
+                config.show_hierarchy_arrows = !config.show_hierarchy_arrows;
             });
         }
         "add.cube" => {

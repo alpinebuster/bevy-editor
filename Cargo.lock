@@ -4328,6 +4328,7 @@ dependencies = [
  "bincode",
  "dirs",
  "ehttp",
+ "jackdaw_avian_integration",
  "jackdaw_camera",
  "jackdaw_commands",
  "jackdaw_feathers",
@@ -4342,6 +4343,14 @@ dependencies = [
  "rfd",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "jackdaw_avian_integration"
+version = "0.2.1"
+dependencies = [
+ "avian3d",
+ "bevy",
 ]
 
 [[package]]
