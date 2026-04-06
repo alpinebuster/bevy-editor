@@ -248,6 +248,38 @@ fn is_editable_primitive(value: &dyn PartialReflect) -> bool {
         || value.try_downcast_ref::<String>().is_some()
 }
 
+/// Public entry point for spawning a single field row. Used by
+/// `physics_display` for collider variant fields.
+pub(super) fn spawn_field_row_public(
+    commands: &mut Commands,
+    parent: Entity,
+    name: &str,
+    value: &dyn PartialReflect,
+    depth: usize,
+    field_path: String,
+    source_entity: Entity,
+    type_path: &str,
+    entity_names: &Query<&Name>,
+    type_registry: &AppTypeRegistry,
+    editor_font: &Handle<Font>,
+    icon_font: &Handle<Font>,
+) {
+    spawn_field_row(
+        commands,
+        parent,
+        name,
+        value,
+        depth,
+        field_path,
+        source_entity,
+        type_path,
+        entity_names,
+        type_registry,
+        editor_font,
+        icon_font,
+    );
+}
+
 fn spawn_field_row(
     commands: &mut Commands,
     parent: Entity,
@@ -2113,6 +2145,18 @@ pub(super) fn spawn_variant_contents(
 }
 
 /// Apply an enum variant change with undo support.
+/// Public entry point for switching an enum variant with undo support.
+/// Used by `physics_display` for the collider type dropdown.
+pub(super) fn apply_enum_variant_with_undo_public(
+    world: &mut World,
+    entity: Entity,
+    type_path: &str,
+    field_path: &str,
+    variant_name: &str,
+) {
+    apply_enum_variant_with_undo(world, entity, type_path, field_path, variant_name);
+}
+
 fn apply_enum_variant_with_undo(
     world: &mut World,
     _entity: Entity,

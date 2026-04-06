@@ -220,6 +220,18 @@ pub(crate) fn build_inspector_displays(
         },
     );
 
+    // Physics section -- always visible, combines RigidBody + AvianCollider
+    super::physics_display::spawn_physics_section(
+        commands,
+        inspector_entity,
+        source_entity,
+        entity_ref,
+        &icon_font.0,
+        &editor_font.0,
+        type_registry,
+        names,
+    );
+
     let registry = type_registry.read();
 
     // Check for prefab baseline (override tracking)
@@ -242,6 +254,13 @@ pub(crate) fn build_inspector_displays(
                 if full_path.starts_with("jackdaw")
                     && !full_path.starts_with("jackdaw_jsn")
                     && !full_path.starts_with("jackdaw_avian_integration")
+                {
+                    return None;
+                }
+                // Hide all avian3d + AvianCollider components from generic
+                // groups -- they're managed by the dedicated Physics section.
+                if full_path.starts_with("avian3d::")
+                    || full_path == "jackdaw_avian_integration::AvianCollider"
                 {
                     return None;
                 }

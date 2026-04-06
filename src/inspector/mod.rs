@@ -3,6 +3,7 @@ pub(crate) mod component_display;
 mod component_picker;
 mod custom_props_display;
 mod material_display;
+pub(crate) mod physics_display;
 pub(crate) mod reflect_fields;
 
 use crate::EditorEntity;
@@ -115,6 +116,7 @@ impl Plugin for InspectorPlugin {
             .add_observer(component_picker::on_add_component_button_click)
             .add_observer(reflect_fields::on_checkbox_commit)
             .add_observer(reflect_fields::on_text_edit_commit)
+            .add_observer(physics_display::on_physics_enable_toggle)
             .add_observer(custom_props_display::on_custom_property_checkbox_commit)
             .add_observer(custom_props_display::on_custom_property_text_commit)
             .add_observer(brush_display::handle_clear_texture)
