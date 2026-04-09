@@ -549,7 +549,7 @@ pub fn tree_keyboard_navigation(
                     // Collapse the node
                     commands.entity(entity).insert(TreeNodeExpanded(false));
                 }
-                // If already collapsed, could move to parent — but skipping for now
+                // If already collapsed, could move to parent, but skipping for now.
             }
         }
     }

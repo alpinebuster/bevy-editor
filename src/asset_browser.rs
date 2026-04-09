@@ -1286,7 +1286,7 @@ pub fn asset_browser_panel(icon_font: Handle<Font>) -> impl Bundle {
                                     TextColor(tokens::TAB_INACTIVE_TEXT),
                                 )],
                             ),
-                            // Folder icon (active — has blue left border)
+                            // Folder icon (active, has blue left border)
                             (
                                 Node {
                                     width: Val::Px(29.0),

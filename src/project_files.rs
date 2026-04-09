@@ -1,4 +1,4 @@
-//! Project Files panel — a file tree view with live filesystem watching.
+//! Project Files panel: a file tree view with live filesystem watching.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, mpsc};
@@ -297,7 +297,7 @@ fn spawn_file_tree_row(
         ))
         .id();
 
-    // Note: We intentionally do NOT add TreeNode(self) here — TreeNode is a
+    // Note: We intentionally do NOT add TreeNode(self) here. TreeNode is a
     // relationship component that would warn about self-referencing. Project file
     // nodes use ProjectFileNode instead of TreeNode for identification.
 

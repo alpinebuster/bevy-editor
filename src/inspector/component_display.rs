@@ -118,7 +118,7 @@ pub(crate) fn build_inspector_displays(
             ChildOf(inspector_entity),
             children![(
                 Text::new(format!(
-                    "{selection_count} entities selected — edits apply to all"
+                    "{selection_count} entities selected, edits apply to all"
                 )),
                 TextFont {
                     font: editor_font.0.clone(),
@@ -324,7 +324,7 @@ pub(crate) fn build_inspector_displays(
                 continue;
             }
 
-            // Priority 2: MeshMaterial3d<StandardMaterial> — display material fields
+            // Priority 2: MeshMaterial3d<StandardMaterial>, display material fields
             if type_id == TypeId::of::<MeshMaterial3d<StandardMaterial>>() {
                 material_display::spawn_material_display_deferred(
                     commands,
@@ -334,7 +334,7 @@ pub(crate) fn build_inspector_displays(
                 continue;
             }
 
-            // Priority 3: CustomProperties — specialized property editor
+            // Priority 3: CustomProperties, specialized property editor
             if type_id == TypeId::of::<CustomProperties>() {
                 if let Some(cp) = reflected.downcast_ref::<CustomProperties>() {
                     custom_props_display::spawn_custom_properties_display(
@@ -349,7 +349,7 @@ pub(crate) fn build_inspector_displays(
                 continue;
             }
 
-            // Priority 3b: Brush — show face/vertex info
+            // Priority 3b: Brush, show face/vertex info
             if type_id == TypeId::of::<crate::brush::Brush>() {
                 if let Some(brush) = reflected.downcast_ref::<crate::brush::Brush>() {
                     brush_display::spawn_brush_display(commands, body_entity, brush, materials);
@@ -357,7 +357,7 @@ pub(crate) fn build_inspector_displays(
                 continue;
             }
 
-            // Priority 3c: Terrain — custom inspector sections
+            // Priority 3c: Terrain, custom inspector sections
             if type_id == TypeId::of::<jackdaw_jsn::Terrain>() {
                 crate::terrain::inspector::spawn_terrain_inspector_container(commands, body_entity);
                 continue;
@@ -552,7 +552,7 @@ pub(crate) fn spawn_component_display(
         ))
         .id();
 
-    // Header — Figma: space-between with [chevron] [icon+name] [ellipsis]
+    // Header (Figma: space-between with [chevron] [icon+name] [ellipsis])
     let header = commands
         .spawn((
             CollapsibleHeader,

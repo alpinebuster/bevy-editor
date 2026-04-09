@@ -17,7 +17,7 @@ pub const PRIMARY_COLOR: Srgba = tailwind::BLUE_500;
 pub const ACCENT_BLUE: Color = Color::srgb(0.126, 0.431, 0.784);
 
 // ---------------------------------------------------------------------------
-// Backgrounds — from Figma CSS (updated palette, slightly bluer tones)
+// Backgrounds (from Figma CSS, updated palette, slightly bluer tones)
 // ---------------------------------------------------------------------------
 
 /// Root window / frame background (#1F1F24)
@@ -78,7 +78,7 @@ pub const VIEWPORT_CONTROL_BG: Color = Color::srgb(0.165, 0.165, 0.180);
 
 /// Elevated background for inputs and interactive elements (#36373B)
 pub const ELEVATED_BG: Color = Color::srgb(0.212, 0.216, 0.231);
-/// Axis label container background — lighter than input (#46474C)
+/// Axis label container background, lighter than input (#46474C)
 pub const AXIS_LABEL_BG: Color = Color::srgb(0.275, 0.278, 0.298);
 /// Active toolbar button background (#505050)
 pub const TOOLBAR_ACTIVE_BG: Color = Color::srgb(0.314, 0.314, 0.314);
@@ -175,11 +175,11 @@ pub const CATEGORY_ENTITY: Color = Color::srgba(0.259, 0.725, 0.514, 1.0);
 pub const TEXT_PRIMARY: Color = Color::srgb(0.925, 0.925, 0.925);
 /// Secondary / dimmed text (#A8A8A8)
 pub const TEXT_SECONDARY: Color = Color::srgb(0.659, 0.659, 0.659);
-/// Tertiary text — breadcrumbs, field values (#C8C8C8)
+/// Tertiary text: breadcrumbs, field values (#C8C8C8)
 pub const TEXT_TERTIARY: Color = Color::srgb(0.784, 0.784, 0.784);
 /// Accent / link text
 pub const TEXT_ACCENT: Color = Color::Srgba(tailwind::BLUE_400);
-/// Accent hover — lighter blue
+/// Accent hover, lighter blue
 pub const TEXT_ACCENT_HOVER: Color = Color::Srgba(tailwind::BLUE_300);
 /// Body text color (widget standard)
 pub const TEXT_BODY_COLOR: Srgba = tailwind::ZINC_200;
@@ -192,37 +192,38 @@ pub const TEXT_MUTED_COLOR: Srgba = tailwind::ZINC_400;
 // Type-specific field label colors
 // ---------------------------------------------------------------------------
 
-/// Numeric (f32/f64/int) field label — green tint
+/// Numeric (f32/f64/int) field label, green tint
 pub const TYPE_NUMERIC: Color = Color::srgb(0.55, 0.78, 0.55);
-/// Boolean field label — blue tint
+/// Boolean field label, blue tint
 pub const TYPE_BOOL: Color = Color::srgb(0.55, 0.65, 0.85);
-/// String field label — orange tint
+/// String field label, orange tint
 pub const TYPE_STRING: Color = Color::srgb(0.85, 0.70, 0.45);
-/// Entity reference field label — white
+/// Entity reference field label, white
 pub const TYPE_ENTITY: Color = Color::Srgba(tailwind::ZINC_300);
-/// Enum field label — purple tint
+/// Enum field label, purple tint
 pub const TYPE_ENUM: Color = Color::srgb(0.72, 0.55, 0.82);
 
 // ---------------------------------------------------------------------------
 // XYZ axis colors (from updated Figma CSS)
 // ---------------------------------------------------------------------------
 
-/// X axis color — red (#AB4051)
+/// X axis color, red (#AB4051)
+#[allow(clippy::approx_constant)]
 pub const AXIS_X_COLOR: Color = Color::srgb(0.671, 0.251, 0.318);
-/// Y axis color — green (#5D8D0A)
+/// Y axis color, green (#5D8D0A)
 pub const AXIS_Y_COLOR: Color = Color::srgb(0.365, 0.553, 0.039);
-/// Z axis color — blue (#2160A3)
+/// Z axis color, blue (#2160A3)
 pub const AXIS_Z_COLOR: Color = Color::srgb(0.129, 0.376, 0.639);
-/// W axis color — neutral grey (#808080)
+/// W axis color, neutral grey (#808080)
 pub const AXIS_W_COLOR: Color = Color::srgb(0.502, 0.502, 0.502);
 
 // ---------------------------------------------------------------------------
 // File browser icon colors
 // ---------------------------------------------------------------------------
 
-/// Directory icon — warm yellow
+/// Directory icon, warm yellow
 pub const DIR_ICON_COLOR: Color = Color::srgb(0.9, 0.8, 0.3);
-/// Generic file icon — grey
+/// Generic file icon, grey
 pub const FILE_ICON_COLOR: Color = Color::Srgba(tailwind::ZINC_400);
 
 // ---------------------------------------------------------------------------
@@ -243,9 +244,9 @@ pub const FONT_LG: f32 = TEXT_SIZE_LG;
 // Icon sizes (Lucide frame sizes)
 // ---------------------------------------------------------------------------
 
-/// Small icon size — standard Lucide icons (15px frame)
+/// Small icon size, standard Lucide icons (15px frame)
 pub const ICON_SM: f32 = 15.0;
-/// Medium icon size — sidebar icons (17px)
+/// Medium icon size, sidebar icons (17px)
 pub const ICON_MD: f32 = 17.0;
 /// Large icon size (24px)
 pub const ICON_LG: f32 = 24.0;

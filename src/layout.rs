@@ -91,7 +91,7 @@ pub fn editor_layout(icon_font: &IconFont) -> impl Bundle {
     let font = icon_font.0.clone();
     (
         EditorEntity,
-        // Outer shell — dark background with padding (Figma: 10px padding, bg #171717)
+        // Outer shell: dark background with padding (Figma: 10px padding, bg #171717)
         BackgroundColor(tokens::WINDOW_BG),
         Node {
             width: percent(100),
@@ -102,7 +102,7 @@ pub fn editor_layout(icon_font: &IconFont) -> impl Bundle {
             ..Default::default()
         },
         children![(
-            // Inner container — the editor workspace with rounded corners and border
+            // Inner container: the editor workspace with rounded corners and border.
             EditorEntity,
             Node {
                 width: percent(100),
@@ -119,7 +119,7 @@ pub fn editor_layout(icon_font: &IconFont) -> impl Bundle {
             children![
                 // Integrated window header: menu bar + scene tabs + controls
                 window_header(),
-                // Content container (flex grow) — holds both workspaces
+                // Content container (flex grow). Holds both workspaces.
                 // Figma: Editor (Rows) has padding: 0px 4px
                 (
                     EditorEntity,
@@ -156,16 +156,16 @@ pub fn editor_layout(icon_font: &IconFont) -> impl Bundle {
                             split_panel::panel_group(
                                 0.1,
                                 (
-                                    // Left column — hierarchy + project files (~266px default, ratio 1)
+                                    // Left column: hierarchy + project files (~266px default, ratio 1)
                                     Spawn((split_panel::panel(1), left_column(font.clone()))),
                                     Spawn(split_panel::panel_handle()),
-                                    // Center column — viewport + bottom panels (ratio 4)
+                                    // Center column: viewport + bottom panels (ratio 4)
                                     Spawn((
                                         split_panel::panel(4),
                                         center_column(font.clone()),
                                     )),
                                     Spawn(split_panel::panel_handle()),
-                                    // Right column — inspector (~310px default, ratio 1)
+                                    // Right column: inspector (~310px default, ratio 1)
                                     Spawn((split_panel::panel(1), entity_inspector(font.clone()))),
                                 ),
                             ),
@@ -354,7 +354,7 @@ fn left_column(icon_font: Handle<Font>) -> impl Bundle {
     )
 }
 
-/// Project Files panel — file tree browser
+/// Project Files panel. File tree browser.
 fn project_files_panel() -> impl Bundle {
     (
         EditorEntity,
@@ -384,7 +384,7 @@ fn project_files_panel() -> impl Bundle {
                         .allow_empty()
                 ),)],
             ),
-            // File tree content — populated by ProjectFilesPlugin
+            // File tree content, populated by ProjectFilesPlugin.
             (
                 crate::project_files::ProjectFilesTree,
                 EditorEntity,
@@ -1276,7 +1276,7 @@ pub fn update_space_toggle_label(
 }
 
 /// Updates edit tool button backgrounds to highlight the active edit mode/draw state.
-pub fn update_edit_tool_highlights(
+pub(crate) fn update_edit_tool_highlights(
     edit_mode: Res<EditMode>,
     draw_state: Res<DrawBrushState>,
     mut buttons: Query<(&EditToolButton, &mut BackgroundColor)>,
@@ -1508,7 +1508,7 @@ fn entity_inspector(icon_font: Handle<Font>) -> impl Bundle {
                                         .allow_empty()
                                 ),
                             ),
-                            // Add Component button — wired to component_picker observer
+                            // Add Component button, wired to component_picker observer.
                             (
                                 crate::inspector::AddComponentButton,
                                 Interaction::default(),

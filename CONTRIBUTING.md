@@ -6,13 +6,13 @@ Thank you for your interest in contributing to Jackdaw! This document covers the
 
 ### Prerequisites
 
-- **Rust nightly toolchain** — Jackdaw uses edition 2024 features
+- **Rust nightly toolchain** - Jackdaw uses edition 2024 features
   ```sh
   rustup toolchain install nightly
   rustup default nightly
   ```
-- **System dependencies** — GPU drivers with Vulkan support (or Metal on macOS)
-- **Linux extras** — `libudev-dev`, `libasound2-dev`, `libwayland-dev` (or equivalent for your distro)
+- **System dependencies** - GPU drivers with Vulkan support (or Metal on macOS)
+- **Linux extras** - `libudev-dev`, `libasound2-dev`, `libwayland-dev` (or equivalent for your distro)
 
 ### Clone and Build
 
@@ -51,7 +51,7 @@ cargo doc --workspace --no-deps
 ## Pull Requests
 
 1. Fork the repository and create a feature branch from `main`
-2. Keep changes focused — one feature or fix per PR please!
+2. Keep changes focused - one feature or fix per PR please!
 3. Make sure all checks above pass
 4. Open a PR against `main` with a clear description of what changed and why
 

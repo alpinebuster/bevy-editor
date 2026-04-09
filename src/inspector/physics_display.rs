@@ -42,7 +42,7 @@ pub(super) fn spawn_physics_section(
     let has_collider = entity_ref.contains::<AvianCollider>();
     let is_enabled = has_rb || has_collider;
 
-    // Collapsible section — card styling
+    // Collapsible section (card styling)
     let section = commands
         .spawn((
             super::ComponentDisplay,
@@ -67,7 +67,7 @@ pub(super) fn spawn_physics_section(
         ))
         .id();
 
-    // Header — card header styling
+    // Header (card header styling)
     let header = commands
         .spawn((
             CollapsibleHeader,

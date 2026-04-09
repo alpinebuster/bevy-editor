@@ -197,7 +197,7 @@ fn auto_hide_internal_entities(
 ) {
     for (entity, name, parent) in &new_entities {
         if name.is_none() && parent.is_some() {
-            // Skip GLTF descendants — they'll be shown in the hierarchy
+            // Skip GLTF descendants, they'll be shown in the hierarchy.
             let mut current = entity;
             let mut is_gltf_descendant = false;
             while let Ok(&ChildOf(p)) = parent_query.get(current) {

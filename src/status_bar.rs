@@ -64,7 +64,7 @@ fn update_status_left(
     git_info: Res<GitInfo>,
     mut text_query: Query<&mut Text, With<StatusBarLeft>>,
 ) {
-    // Git info is static — only set once
+    // Git info is static, only set once
     let Ok(mut text) = text_query.single_mut() else {
         return;
     };
