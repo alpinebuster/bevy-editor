@@ -1,5 +1,6 @@
 use bevy::{feathers::theme::ThemedText, picking::hover::Hovered, prelude::*, ui_widgets::observe};
 use jackdaw_feathers::{
+    combobox::{self, ComboBoxChangeEvent},
     icons::{Icon, IconFont},
     menu_bar, panel_header, popover, separator, split_panel, status_bar,
     text_edit::{self, TextEditProps},
@@ -21,29 +22,80 @@ use crate::{
     viewport::SceneViewport,
 };
 
-/// Which workspace tab is active.
-#[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
-pub enum ActiveWorkspace {
+/// Discriminator for the header tab kinds the editor knows how to host.
+/// New kinds will be added for animation-graph assets, shader assets, etc.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+pub enum TabKind {
+    /// The live scene being edited. There's exactly one Scene tab.
     #[default]
-    SceneEditor,
-    RemoteDebug,
+    Scene,
+    /// The Schedule Explorer / remote debug view (replaces the old
+    /// "Remote Debug" workspace). There's exactly one Schedule Explorer
+    /// tab.
+    ScheduleExplorer,
 }
 
-/// Marker for the workspace tab bar row.
-#[derive(Component)]
-pub struct WorkspaceTabBar;
+impl TabKind {
+    /// Human-readable label shown on the tab strip.
+    pub fn label(self) -> &'static str {
+        match self {
+            TabKind::Scene => "Main scene",
+            TabKind::ScheduleExplorer => "Schedule Explorer",
+        }
+    }
 
-/// Marker for a workspace tab, storing which workspace it activates.
-#[derive(Component)]
-pub struct WorkspaceTab(pub ActiveWorkspace);
+    /// Colored accent stripe drawn at the left edge of the tab.
+    pub fn accent(self) -> Color {
+        match self {
+            TabKind::Scene => tokens::DOC_TAB_SCENE_ACCENT,
+            TabKind::ScheduleExplorer => tokens::DOC_TAB_TOOL_ACCENT,
+        }
+    }
 
-/// Marker for the scene editor workspace container.
-#[derive(Component)]
-pub struct SceneEditorWorkspace;
+    /// Icon glyph rendered in the tab header.
+    pub fn icon(self) -> Icon {
+        match self {
+            TabKind::Scene => Icon::File,
+            TabKind::ScheduleExplorer => Icon::CalendarSearch,
+        }
+    }
+}
 
-/// Marker for the remote debug workspace container.
+/// Layout preset for the Scene document tab, chosen via the header's
+/// `Scene View ▾` dropdown. Phase 5 wires up the `Animation` variant; for
+/// now it just reveals an empty placeholder panel.
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum SceneViewPreset {
+    #[default]
+    Scene,
+    Animation,
+}
+
+/// The tab the editor is currently showing.
+#[derive(Resource, Default, Clone, Copy)]
+pub struct ActiveDocument {
+    pub kind: TabKind,
+}
+
+/// Marker on the tab strip row container so the tab styling system can
+/// find its children.
 #[derive(Component)]
-pub struct RemoteDebugWorkspace;
+pub struct DocumentTabStrip;
+
+/// Marker on an individual document tab button, tagged with the
+/// `TabKind` it activates when clicked.
+#[derive(Component)]
+pub struct DocumentTabButton(pub TabKind);
+
+/// Marker on a document content container. The per-frame
+/// `update_active_document_display` system toggles `Node::display` on
+/// these so only the matching-kind container is visible.
+#[derive(Component)]
+pub struct DocumentRoot(pub TabKind);
+
+/// Marker on the Scene View combobox wrapper so we can find it later.
+#[derive(Component)]
+pub struct SceneViewDropdownButton;
 
 /// Marker on the hierarchy filter text input
 #[derive(Component)]
@@ -133,9 +185,9 @@ pub fn editor_layout(icon_font: &IconFont) -> impl Bundle {
                         ..Default::default()
                     },
                     children![
-                    // Scene Editor workspace (active by default)
+                    // Scene document (visible by default).
                     (
-                        SceneEditorWorkspace,
+                        DocumentRoot(TabKind::Scene),
                         EditorEntity,
                         Node {
                             width: percent(100),
@@ -171,9 +223,11 @@ pub fn editor_layout(icon_font: &IconFont) -> impl Bundle {
                             ),
                         )],
                     ),
-                    // Remote Debug workspace (hidden by default)
+                    // Schedule Explorer document (hidden by default).
+                    // Formerly the Remote Debug workspace — same content,
+                    // repackaged as a document tab.
                     (
-                        RemoteDebugWorkspace,
+                        DocumentRoot(TabKind::ScheduleExplorer),
                         EditorEntity,
                         Node {
                             width: percent(100),
@@ -207,7 +261,13 @@ pub fn editor_layout(icon_font: &IconFont) -> impl Bundle {
     )
 }
 
-/// Integrated window header: \[menu bar items\] \[scene tabs\] \[controls\]
+/// Integrated window header. Two groups separated by a flexible spacer:
+/// the **left group** owns the menu bar and the document tab strip (so
+/// tabs sit right after the `Add` menu, matching the Figma mock), and
+/// the **right group** owns the Scene View combobox and the Play/Pause
+/// pill. A flex-grow spacer between them absorbs the slack, so resizing
+/// the dropdown label (e.g. `Scene View ▾` → `Animation View ▾`) can't
+/// shift the tabs.
 fn window_header() -> impl Bundle {
     (
         EditorEntity,
@@ -222,75 +282,98 @@ fn window_header() -> impl Bundle {
         },
         BackgroundColor(tokens::WINDOW_BG),
         children![
-            // Left: App name + menu bar
+            // Left: menu bar + tab strip, sitting flush to the left
+            // edge. `column_gap` pushes the tabs slightly away from the
+            // last menu item ("Add").
             (
-                // This node hosts the MenuBar + MenuBarRoot so populate_menu_bar still works
-                menu_bar::menu_bar_shell(),
-            ),
-            // Center: workspace / scene tabs
-            (
-                WorkspaceTabBar,
                 EditorEntity,
                 Node {
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    flex_grow: 1.0,
                     height: percent(100),
-                    column_gap: px(tokens::SPACING_SM),
+                    column_gap: px(tokens::SPACING_LG),
                     ..Default::default()
                 },
                 children![
-                    scene_tab("Main scene", ActiveWorkspace::SceneEditor, true),
-                    scene_tab("Remote", ActiveWorkspace::RemoteDebug, false),
+                    menu_bar::menu_bar_shell(),
+                    (
+                        DocumentTabStrip,
+                        EditorEntity,
+                        Node {
+                            flex_direction: FlexDirection::Row,
+                            align_items: AlignItems::Center,
+                            height: percent(100),
+                            column_gap: px(4.0),
+                            ..Default::default()
+                        },
+                        children![
+                            document_tab(TabKind::Scene, true),
+                            document_tab(TabKind::ScheduleExplorer, false),
+                        ],
+                    ),
                 ],
             ),
-            // Right: placeholder for play/pause controls
+            // Flexible spacer — absorbs leftover horizontal space
+            // between the left group and the right group.
+            (
+                EditorEntity,
+                Node {
+                    flex_grow: 1.0,
+                    ..Default::default()
+                },
+            ),
+            // Right: Scene View combobox + Play/Pause transport.
             (
                 EditorEntity,
                 Node {
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                     padding: UiRect::horizontal(px(tokens::SPACING_MD)),
-                    column_gap: px(tokens::SPACING_SM),
+                    column_gap: px(6.0),
                     ..Default::default()
                 },
+                children![scene_view_dropdown(), play_pause_controls(),],
             ),
         ],
     )
 }
 
-/// A scene tab in the header with colored accent bar.
-fn scene_tab(label: &str, workspace: ActiveWorkspace, active: bool) -> impl Bundle {
-    let accent_color = if active {
-        tokens::ACCENT_BLUE
-    } else {
-        Color::NONE
-    };
+/// A single document tab in the header strip. Carries a
+/// [`DocumentTabButton`] marker with its `TabKind`, and an inline click
+/// observer that flips [`ActiveDocument`] to that kind. Styling is
+/// refreshed every frame by [`update_tab_strip_highlights`].
+fn document_tab(kind: TabKind, active: bool) -> impl Bundle {
     let bg = if active {
-        Color::srgba(1.0, 1.0, 1.0, 0.08)
+        tokens::DOC_TAB_ACTIVE_BG
     } else {
         Color::NONE
     };
-    let text_color = if active {
-        tokens::TEXT_PRIMARY
+    let border = if active {
+        tokens::DOC_TAB_ACTIVE_BORDER
     } else {
-        tokens::TEXT_SECONDARY
+        Color::NONE
+    };
+    let label_color = if active {
+        tokens::DOC_TAB_ACTIVE_LABEL
+    } else {
+        tokens::DOC_TAB_INACTIVE_LABEL
     };
     (
-        WorkspaceTab(workspace),
-        Interaction::default(),
+        DocumentTabButton(kind),
+        Hovered::default(),
         Node {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             padding: UiRect::axes(px(7.0), px(4.0)),
             column_gap: px(5.0),
+            border: UiRect::all(px(1.0)),
             border_radius: BorderRadius::all(px(tokens::BORDER_RADIUS_MD)),
             ..Default::default()
         },
         BackgroundColor(bg),
+        BorderColor::all(border),
         children![
-            // Colored accent bar (2.5x12px)
+            // 2.5×12 accent stripe keyed off the TabKind.
             (
                 Node {
                     width: px(2.5),
@@ -298,37 +381,114 @@ fn scene_tab(label: &str, workspace: ActiveWorkspace, active: bool) -> impl Bund
                     border_radius: BorderRadius::all(px(5.0)),
                     ..Default::default()
                 },
-                BackgroundColor(accent_color),
+                BackgroundColor(kind.accent()),
             ),
-            // Icon
+            // 12×12 lucide icon.
             (
-                Text::new(String::from(Icon::File.unicode())),
+                Text::new(String::from(kind.icon().unicode())),
                 TextFont {
                     font_size: 12.0,
                     ..Default::default()
                 },
-                TextColor(text_color),
+                TextColor(label_color),
             ),
-            // Label
+            // Label.
             (
-                Text::new(label.to_string()),
+                Text::new(kind.label().to_string()),
                 TextFont {
-                    font_size: tokens::TEXT_SIZE_LG,
+                    font_size: tokens::FONT_MD,
                     ..Default::default()
                 },
-                TextColor(text_color),
+                TextColor(label_color),
             ),
         ],
         observe(
             move |_: On<Pointer<Click>>,
-                  mut workspace_res: ResMut<ActiveWorkspace>,
+                  mut active: ResMut<ActiveDocument>,
                   manager: Res<ConnectionManager>| {
-                if workspace == ActiveWorkspace::RemoteDebug && !manager.is_connected() {
+                // Keep the "Remote disconnected ⇒ can't open" guard from
+                // the old workspace tab, now gating the Schedule Explorer.
+                if kind == TabKind::ScheduleExplorer && !manager.is_connected() {
                     return;
                 }
-                *workspace_res = workspace;
+                active.kind = kind;
             },
         ),
+    )
+}
+
+/// Scene View ▾ combobox using the shared feathers widget. Clicking it
+/// opens a proper popover with entries for each [`SceneViewPreset`];
+/// selecting one fires a [`ComboBoxChangeEvent`] which
+/// [`on_scene_view_combobox_change`] translates into a resource update.
+///
+/// Wrapped in a fixed-width container so the overall header layout stays
+/// stable when the selected label changes width.
+fn scene_view_dropdown() -> impl Bundle {
+    (
+        SceneViewDropdownButton,
+        EditorEntity,
+        Node {
+            width: px(150.0),
+            height: px(24.0),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            ..Default::default()
+        },
+        children![(
+            combobox::combobox_with_selected(
+                vec!["Scene View", "Animation View"],
+                0,
+            ),
+            observe(|event: On<ComboBoxChangeEvent>, mut preset: ResMut<SceneViewPreset>| {
+                *preset = match event.selected {
+                    0 => SceneViewPreset::Scene,
+                    1 => SceneViewPreset::Animation,
+                    _ => SceneViewPreset::Scene,
+                };
+            }),
+        )],
+    )
+}
+
+/// Play/Pause transport pill. Visual placeholder — the editor doesn't
+/// have a play mode yet, so these buttons are no-ops. Phase 5's
+/// animation-preview work will wire them up to the preview
+/// `AnimationPlayer`.
+fn play_pause_controls() -> impl Bundle {
+    (
+        EditorEntity,
+        Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            height: px(22.0),
+            padding: UiRect::horizontal(px(6.5)),
+            column_gap: px(9.0),
+            border: UiRect::all(px(1.0)),
+            border_radius: BorderRadius::all(px(tokens::BORDER_RADIUS_LG)),
+            ..Default::default()
+        },
+        BackgroundColor(tokens::HEADER_CONTROL_BG),
+        BorderColor::all(tokens::HEADER_CONTROL_BORDER),
+        children![
+            (
+                Text::new(String::from(Icon::Play.unicode())),
+                TextFont {
+                    font_size: 13.0,
+                    ..Default::default()
+                },
+                TextColor(tokens::HEADER_CONTROL_LABEL),
+            ),
+            (
+                Text::new(String::from(Icon::Pause.unicode())),
+                TextFont {
+                    font_size: 13.0,
+                    ..Default::default()
+                },
+                TextColor(tokens::HEADER_CONTROL_LABEL),
+            ),
+        ],
     )
 }
 
@@ -1311,30 +1471,16 @@ pub(crate) fn update_edit_tool_highlights(
     }
 }
 
-/// Toggle workspace container visibility when ActiveWorkspace changes.
-pub fn update_workspace_visibility(
-    workspace: Res<ActiveWorkspace>,
-    mut scene_editors: Query<
-        &mut Node,
-        (With<SceneEditorWorkspace>, Without<RemoteDebugWorkspace>),
-    >,
-    mut remote_debugs: Query<
-        &mut Node,
-        (With<RemoteDebugWorkspace>, Without<SceneEditorWorkspace>),
-    >,
+/// Toggle document-root visibility when the active tab changes.
+pub fn update_active_document_display(
+    active: Res<ActiveDocument>,
+    mut roots: Query<(&DocumentRoot, &mut Node)>,
 ) {
-    if !workspace.is_changed() {
+    if !active.is_changed() {
         return;
     }
-    for mut node in &mut scene_editors {
-        node.display = if *workspace == ActiveWorkspace::SceneEditor {
-            Display::Flex
-        } else {
-            Display::None
-        };
-    }
-    for mut node in &mut remote_debugs {
-        node.display = if *workspace == ActiveWorkspace::RemoteDebug {
+    for (root, mut node) in &mut roots {
+        node.display = if root.0 == active.kind {
             Display::Flex
         } else {
             Display::None
@@ -1342,51 +1488,53 @@ pub fn update_workspace_visibility(
     }
 }
 
-/// Update scene tab styling and dim remote tab when disconnected.
-pub fn update_tab_highlights(
-    workspace: Res<ActiveWorkspace>,
+/// Refresh tab-strip styling — active tab gets its bg + border, inactive
+/// tabs go transparent; Schedule Explorer dims when Remote is
+/// disconnected.
+pub fn update_tab_strip_highlights(
+    active: Res<ActiveDocument>,
     manager: Res<ConnectionManager>,
-    mut tabs: Query<(&WorkspaceTab, &mut BackgroundColor, &Children)>,
+    mut tabs: Query<(
+        &DocumentTabButton,
+        &mut BackgroundColor,
+        &mut BorderColor,
+        &Children,
+    )>,
     mut texts: Query<&mut TextColor>,
-    mut bgs: Query<&mut BackgroundColor, Without<WorkspaceTab>>,
 ) {
-    if !workspace.is_changed() && !manager.is_changed() {
+    if !active.is_changed() && !manager.is_changed() {
         return;
     }
     let connected = manager.is_connected();
-    for (tab, mut tab_bg, children) in &mut tabs {
-        let is_active = tab.0 == *workspace;
-        let is_disabled = tab.0 == ActiveWorkspace::RemoteDebug && !connected;
+    for (tab, mut tab_bg, mut tab_border, children) in &mut tabs {
+        let is_active = tab.0 == active.kind;
+        let is_disabled = tab.0 == TabKind::ScheduleExplorer && !connected;
 
-        // Tab background
         tab_bg.0 = if is_active {
-            Color::srgba(1.0, 1.0, 1.0, 0.08)
+            tokens::DOC_TAB_ACTIVE_BG
         } else {
             Color::NONE
         };
+        *tab_border = BorderColor::all(if is_active {
+            tokens::DOC_TAB_ACTIVE_BORDER
+        } else {
+            Color::NONE
+        });
 
-        let text_color = if is_disabled {
+        let label_color = if is_disabled {
             Color::srgba(0.4, 0.4, 0.4, 0.5)
         } else if is_active {
-            tokens::TEXT_PRIMARY
+            tokens::DOC_TAB_ACTIVE_LABEL
         } else {
-            tokens::TEXT_SECONDARY
+            tokens::DOC_TAB_INACTIVE_LABEL
         };
 
-        // Update text + accent bar colors on children
-        let accent_color = if is_active {
-            tokens::ACCENT_BLUE
-        } else {
-            Color::NONE
-        };
-
-        for child in children.iter() {
+        // First child is the accent strip (skip it — its color is
+        // type-fixed). Second and third children are the icon and
+        // label text — refresh their colors.
+        for child in children.iter().skip(1) {
             if let Ok(mut tc) = texts.get_mut(child) {
-                tc.0 = text_color;
-            }
-            // Update accent bar bg (first child is the 2.5px bar)
-            if let Ok(mut child_bg) = bgs.get_mut(child) {
-                child_bg.0 = accent_color;
+                tc.0 = label_color;
             }
         }
     }

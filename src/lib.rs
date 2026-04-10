@@ -151,7 +151,8 @@ impl Plugin for EditorPlugin {
                     .run_if(no_dialog_open),
             )
             .insert_resource(UiTheme(create_dark_theme()))
-            .init_resource::<layout::ActiveWorkspace>()
+            .init_resource::<layout::ActiveDocument>()
+            .init_resource::<layout::SceneViewPreset>()
             .init_resource::<layout::KeybindHelpPopover>()
             .init_resource::<asset_catalog::AssetCatalog>()
             .init_resource::<jackdaw_jsn::SceneJsnAst>()
@@ -168,8 +169,8 @@ impl Plugin for EditorPlugin {
                     layout::update_toolbar_tooltips,
                     layout::update_space_toggle_label,
                     layout::update_edit_tool_highlights,
-                    layout::update_workspace_visibility,
-                    layout::update_tab_highlights,
+                    layout::update_active_document_display,
+                    layout::update_tab_strip_highlights,
                     auto_hide_internal_entities,
                 )
                     .run_if(in_state(AppState::Editor)),
