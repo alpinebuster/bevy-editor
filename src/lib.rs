@@ -177,6 +177,7 @@ impl Plugin for EditorPlugin {
                     layout::update_dock_body_visibility,
                     layout::update_dock_sidebar_highlights,
                     auto_hide_internal_entities,
+                    decorate_timeline_tooltips,
                     discover_gltf_clips,
                     register_animation_entities_in_ast,
                     follow_scene_selection_to_clip,
@@ -190,6 +191,10 @@ impl Plugin for EditorPlugin {
             .add_observer(handle_menu_action)
             .add_observer(on_create_clip_for_selection)
             .add_observer(on_create_blend_graph_for_selection)
+            .add_observer(on_header_new_clip)
+            .add_observer(on_header_new_blend_graph)
+            .add_observer(on_clip_selector_change)
+            .add_observer(on_clip_name_commit)
             .add_observer(on_duration_input_commit)
             .add_observer(on_timeline_keyframe_click)
             .add_observer(layout::on_dock_sidebar_icon_click);
@@ -238,6 +243,237 @@ fn auto_hide_internal_entities(
 fn spawn_layout(mut commands: Commands, icon_font: Res<jackdaw_feathers::icons::IconFont>) {
     commands.spawn((Camera2d, EditorEntity));
     commands.spawn(layout::editor_layout(&icon_font));
+}
+
+/// Observer: the header "+" button spawns a new keyframe clip on
+/// the same entity as the currently-selected clip. Reuses the same
+/// creation logic as `on_create_clip_for_selection` but sources the
+/// parent from the active clip's `ChildOf`, not from `Selection`.
+fn on_header_new_clip(
+    event: On<jackdaw_feathers::button::ButtonClickEvent>,
+    buttons: Query<(), With<jackdaw_animation::TimelineHeaderNewClipButton>>,
+    selected_clip: Res<jackdaw_animation::SelectedClip>,
+    parents: Query<&ChildOf>,
+    names: Query<&Name>,
+    mut commands: Commands,
+) {
+    if !buttons.contains(event.entity) {
+        return;
+    }
+    let Some(clip_entity) = selected_clip.0 else {
+        return;
+    };
+    let Ok(clip_parent) = parents.get(clip_entity) else {
+        return;
+    };
+    let target = clip_parent.parent();
+    let Ok(name) = names.get(target) else {
+        return;
+    };
+    let target_name = name.as_str().to_string();
+
+    commands.queue(move |world: &mut World| {
+        let clip = world
+            .spawn((
+                jackdaw_animation::Clip::default(),
+                Name::new(format!("{target_name} Clip")),
+                ChildOf(target),
+            ))
+            .id();
+        world.spawn((
+            jackdaw_animation::AnimationTrack::new(
+                "bevy_transform::components::transform::Transform",
+                "translation",
+            ),
+            Name::new(format!("{target_name} / translation")),
+            ChildOf(clip),
+        ));
+        if let Some(mut selected) = world.get_resource_mut::<jackdaw_animation::SelectedClip>() {
+            selected.0 = Some(clip);
+        }
+        if let Some(mut dirty) = world.get_resource_mut::<jackdaw_animation::TimelineDirty>() {
+            dirty.0 = true;
+        }
+    });
+}
+
+/// Observer: the header blend-graph button spawns a new blend graph
+/// clip on the same entity as the currently-selected clip.
+fn on_header_new_blend_graph(
+    event: On<jackdaw_feathers::button::ButtonClickEvent>,
+    buttons: Query<(), With<jackdaw_animation::TimelineHeaderNewBlendGraphButton>>,
+    selected_clip: Res<jackdaw_animation::SelectedClip>,
+    parents: Query<&ChildOf>,
+    names: Query<&Name>,
+    mut commands: Commands,
+) {
+    if !buttons.contains(event.entity) {
+        return;
+    }
+    let Some(clip_entity) = selected_clip.0 else {
+        return;
+    };
+    let Ok(clip_parent) = parents.get(clip_entity) else {
+        return;
+    };
+    let target = clip_parent.parent();
+    let Ok(name) = names.get(target) else {
+        return;
+    };
+    let target_name = name.as_str().to_string();
+
+    commands.queue(move |world: &mut World| {
+        let clip = world
+            .spawn((
+                jackdaw_animation::Clip::default(),
+                jackdaw_animation::AnimationBlendGraph,
+                jackdaw_node_graph::NodeGraph {
+                    title: format!("{target_name} Blend Graph"),
+                },
+                jackdaw_node_graph::GraphCanvasView::default(),
+                Name::new(format!("{target_name} Blend Graph")),
+                ChildOf(target),
+            ))
+            .id();
+        world.spawn((
+            jackdaw_node_graph::GraphNode {
+                node_type: "anim.output".into(),
+                position: Vec2::new(400.0, 160.0),
+            },
+            jackdaw_animation::OutputNode,
+            Name::new("Output"),
+            ChildOf(clip),
+        ));
+        if let Some(mut selected) = world.get_resource_mut::<jackdaw_animation::SelectedClip>() {
+            selected.0 = Some(clip);
+        }
+        if let Some(mut dirty) = world.get_resource_mut::<jackdaw_animation::TimelineDirty>() {
+            dirty.0 = true;
+        }
+    });
+}
+
+/// Observer: the clip selector combobox changed. Read the selected
+/// index, map it to a clip entity via [`TimelineClipSelector`]'s
+/// stored list, and switch `SelectedClip` to that entity.
+fn on_clip_selector_change(
+    event: On<jackdaw_feathers::combobox::ComboBoxChangeEvent>,
+    selectors: Query<&jackdaw_animation::TimelineClipSelector>,
+    child_of_query: Query<&ChildOf>,
+    mut commands: Commands,
+) {
+    let mut current = event.entity;
+    let mut selector = None;
+    for _ in 0..6 {
+        if let Ok(s) = selectors.get(current) {
+            selector = Some(s);
+            break;
+        }
+        let Ok(parent) = child_of_query.get(current) else {
+            break;
+        };
+        current = parent.parent();
+    }
+    let Some(selector) = selector else {
+        return;
+    };
+    let idx = event.selected;
+    let Some(&clip_entity) = selector.sibling_clips.get(idx) else {
+        return;
+    };
+    commands.queue(move |world: &mut World| {
+        if let Some(mut selected) = world.get_resource_mut::<jackdaw_animation::SelectedClip>() {
+            selected.0 = Some(clip_entity);
+        }
+        if let Some(mut dirty) = world.get_resource_mut::<jackdaw_animation::TimelineDirty>() {
+            dirty.0 = true;
+        }
+    });
+}
+
+/// Observer: when the inline clip-name text_edit commits, route the
+/// rename through `SetJsnField` on the `Name` component so it
+/// participates in undo and round-trips through JSN.
+fn on_clip_name_commit(
+    event: On<jackdaw_feathers::text_edit::TextEditCommitEvent>,
+    name_inputs: Query<&jackdaw_animation::TimelineClipNameInput>,
+    child_of_query: Query<&ChildOf>,
+    names: Query<&Name>,
+    mut commands: Commands,
+) {
+    let mut current = event.entity;
+    let mut clip_entity = None;
+    for _ in 0..6 {
+        if let Ok(input) = name_inputs.get(current) {
+            clip_entity = Some(input.clip);
+            break;
+        }
+        let Ok(parent) = child_of_query.get(current) else {
+            break;
+        };
+        current = parent.parent();
+    }
+    let Some(clip_entity) = clip_entity else {
+        return;
+    };
+    let new_name = event.text.clone();
+    if new_name.is_empty() {
+        return;
+    }
+    let Ok(old_name) = names.get(clip_entity) else {
+        return;
+    };
+    if old_name.as_str() == new_name {
+        return;
+    }
+    commands.queue(move |world: &mut World| {
+        if let Some(mut name) = world.get_mut::<Name>(clip_entity) {
+            *name = Name::new(new_name);
+        }
+        if let Some(mut dirty) = world.get_resource_mut::<jackdaw_animation::TimelineDirty>() {
+            dirty.0 = true;
+        }
+    });
+}
+
+/// One-shot decorator: when timeline header buttons appear, stamp
+/// them with `ToolbarTooltip` so the existing tooltip system picks
+/// them up on hover. Runs every frame but short-circuits via
+/// `Added<T>` filters — only fires once per button spawn.
+#[allow(clippy::type_complexity)]
+fn decorate_timeline_tooltips(
+    play: Query<Entity, Added<jackdaw_animation::TimelinePlayButton>>,
+    pause: Query<Entity, Added<jackdaw_animation::TimelinePauseButton>>,
+    stop: Query<Entity, Added<jackdaw_animation::TimelineStopButton>>,
+    new_clip: Query<Entity, Added<jackdaw_animation::TimelineHeaderNewClipButton>>,
+    new_blend: Query<Entity, Added<jackdaw_animation::TimelineHeaderNewBlendGraphButton>>,
+    mut commands: Commands,
+) {
+    for e in &play {
+        commands
+            .entity(e)
+            .insert(layout::ToolbarTooltip("Play".into()));
+    }
+    for e in &pause {
+        commands
+            .entity(e)
+            .insert(layout::ToolbarTooltip("Pause".into()));
+    }
+    for e in &stop {
+        commands
+            .entity(e)
+            .insert(layout::ToolbarTooltip("Stop".into()));
+    }
+    for e in &new_clip {
+        commands
+            .entity(e)
+            .insert(layout::ToolbarTooltip("New Clip".into()));
+    }
+    for e in &new_blend {
+        commands
+            .entity(e)
+            .insert(layout::ToolbarTooltip("New Blend Graph".into()));
+    }
 }
 
 /// Observer: when the placeholder "Create Blend Graph" button is
@@ -441,6 +677,15 @@ fn follow_scene_selection_to_clip(
             }
         }
     }
+
+    // Case C: the selected entity is not an animation entity and has
+    // no clip children. Clear the active clip so the timeline shows
+    // the placeholder with "Create Clip" / "Create Blend Graph".
+    // This is distinct from the empty-selection guard at the top —
+    // empty selection preserves the clip (so keyframe deletes don't
+    // bounce the timeline), but selecting a clipless entity is an
+    // explicit context switch.
+    selected_clip.0 = None;
 }
 
 /// Typed, undo-aware delete command for animation keyframes.

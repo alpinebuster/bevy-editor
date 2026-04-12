@@ -74,6 +74,31 @@ pub struct TimelineCreateClipButton;
 #[derive(Component, Clone, Copy)]
 pub struct TimelineCreateBlendGraphButton;
 
+/// Marker on the combobox that lists sibling clips for switching.
+/// Stores the ordered entity list so the combobox index maps to a
+/// clip entity on `ComboBoxChangeEvent`.
+#[derive(Component, Clone)]
+pub struct TimelineClipSelector {
+    pub sibling_clips: Vec<Entity>,
+}
+
+/// Marker for "New Clip" / "New Blend Graph" buttons that appear in
+/// the header (not just the placeholder), so users can add additional
+/// clips to an entity that already has one.
+#[derive(Component, Clone, Copy)]
+pub struct TimelineHeaderNewClipButton;
+
+#[derive(Component, Clone, Copy)]
+pub struct TimelineHeaderNewBlendGraphButton;
+
+/// Marker on the inline clip-name text_edit in the header. Carries
+/// the clip entity so the commit handler can route the rename through
+/// `SetJsnField`.
+#[derive(Component, Clone, Copy)]
+pub struct TimelineClipNameInput {
+    pub clip: Entity,
+}
+
 /// Marker for the "add keyframe" button on a track row. Carries the
 /// track entity so the observer can read the track's target + field
 /// path and spawn the right keyframe type.
@@ -194,6 +219,8 @@ pub fn rebuild_timeline(
     quat_keyframes: Query<&QuatKeyframe>,
     f32_keyframes: Query<&F32Keyframe>,
     names: Query<&Name>,
+    parents: Query<&ChildOf>,
+    entity_children: Query<&Children>,
     icon_font: Option<Res<IconFont>>,
     mut last_built_for: Local<Option<Entity>>,
 ) {
@@ -230,6 +257,28 @@ pub fn rebuild_timeline(
                     .map(|n| n.as_str().to_string())
                     .unwrap_or_else(|_| "Untitled Clip".to_string());
                 let duration = clip_display_duration(clip_entity, &clips);
+
+                // Collect sibling clips (all Clip children of the
+                // same parent) so the header dropdown can list them.
+                let sibling_clips: Vec<(Entity, String)> = parents
+                    .get(clip_entity)
+                    .ok()
+                    .and_then(|p| entity_children.get(p.parent()).ok())
+                    .map(|children| {
+                        children
+                            .iter()
+                            .filter(|c| clips.contains(*c))
+                            .map(|c| {
+                                let n = names
+                                    .get(c)
+                                    .map(|n| n.as_str().to_string())
+                                    .unwrap_or_else(|_| "Untitled".into());
+                                (c, n)
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_else(|| vec![(clip_entity, clip_name.clone())]);
+
                 spawn_header(
                     &mut commands,
                     panel_entity,
@@ -238,6 +287,7 @@ pub fn rebuild_timeline(
                     cursor.seek_time,
                     duration,
                     &icon_font,
+                    sibling_clips,
                 );
                 if blend_graphs.contains(clip_entity) {
                     // Blend graph clip → node canvas in place of the
@@ -366,6 +416,7 @@ fn spawn_header(
     cursor_time: f32,
     duration: f32,
     icon_font: &IconFont,
+    sibling_clips: Vec<(Entity, String)>,
 ) {
     let header = commands
         .spawn((
@@ -385,6 +436,7 @@ fn spawn_header(
         ))
         .id();
 
+    // Transport controls.
     commands.spawn((
         TimelinePlayButton,
         icon_button(IconButtonProps::new(Icon::Play), &icon_font.0),
@@ -401,18 +453,69 @@ fn spawn_header(
         ChildOf(header),
     ));
 
+    // Clip selector: dropdown listing all sibling clips. If there's
+    // only one clip, the dropdown is still useful for the label and
+    // so the "+" buttons have context.
+    let selected_idx = sibling_clips
+        .iter()
+        .position(|(e, _)| *e == clip_entity)
+        .unwrap_or(0);
+    let clip_entities: Vec<Entity> = sibling_clips.iter().map(|(e, _)| *e).collect();
+    let options: Vec<jackdaw_feathers::combobox::ComboBoxOptionData> = sibling_clips
+        .iter()
+        .map(|(_, name)| jackdaw_feathers::combobox::ComboBoxOptionData::new(name.clone()))
+        .collect();
+    let combo_wrapper = commands
+        .spawn((
+            Node {
+                min_width: Val::Px(120.0),
+                max_width: Val::Px(200.0),
+                ..default()
+            },
+            ChildOf(header),
+        ))
+        .id();
     commands.spawn((
-        Text::new(clip_name.to_string()),
-        TextColor(tokens::TEXT_PRIMARY),
-        TextFont {
-            font_size: tokens::FONT_MD,
-            ..default()
+        TimelineClipSelector {
+            sibling_clips: clip_entities,
         },
-        Node {
-            flex_grow: 1.0,
-            margin: UiRect::horizontal(Val::Px(tokens::SPACING_MD)),
-            ..default()
-        },
+        jackdaw_feathers::combobox::combobox_with_selected(options, selected_idx),
+        ChildOf(combo_wrapper),
+    ));
+
+    // Editable clip name: inline text_edit so the user can rename
+    // the active clip without switching to the inspector. Two-entity
+    // wrapper to avoid duplicate-Node panic (text_edit bundles its
+    // own Node).
+    let name_wrapper = commands
+        .spawn((
+            TimelineClipNameInput { clip: clip_entity },
+            Node {
+                flex_grow: 1.0,
+                margin: UiRect::horizontal(Val::Px(tokens::SPACING_SM)),
+                ..default()
+            },
+            ChildOf(header),
+        ))
+        .id();
+    commands.spawn((
+        jackdaw_feathers::text_edit::text_edit(
+            jackdaw_feathers::text_edit::TextEditProps::default()
+                .with_placeholder("Clip name…")
+                .with_default_value(clip_name.to_string()),
+        ),
+        ChildOf(name_wrapper),
+    ));
+
+    // "+" buttons: create additional clips on the same entity.
+    commands.spawn((
+        TimelineHeaderNewClipButton,
+        icon_button(IconButtonProps::new(Icon::Plus), &icon_font.0),
+        ChildOf(header),
+    ));
+    commands.spawn((
+        TimelineHeaderNewBlendGraphButton,
+        icon_button(IconButtonProps::new(Icon::GitBranch), &icon_font.0),
         ChildOf(header),
     ));
 

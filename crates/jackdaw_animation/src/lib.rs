@@ -76,8 +76,11 @@ pub use player::{
     handle_stop, sync_cursor_from_player,
 };
 pub use timeline::{
-    TimelineAddKeyframeButton, TimelineCreateBlendGraphButton, TimelineCreateClipButton,
-    TimelineDirty, TimelineDurationInput, TimelineKeyframeHandle, TimelinePanelRoot, TrackField,
+    TimelineAddKeyframeButton, TimelineClipNameInput, TimelineClipSelector,
+    TimelineCreateBlendGraphButton, TimelineCreateClipButton, TimelineDirty,
+    TimelineDurationInput, TimelineHeaderNewBlendGraphButton, TimelineHeaderNewClipButton,
+    TimelineKeyframeHandle, TimelinePanelRoot, TimelinePauseButton, TimelinePlayButton,
+    TimelineStopButton, TrackField,
     clear_snap_hint_on_drag_end, handle_add_keyframe_click, handle_scrubber_click,
     handle_scrubber_drag, handle_scrubber_drag_end, handle_scrubber_drag_start,
     handle_transport_button_click, mark_timeline_dirty_on_data_change, pick_tick_step,
@@ -137,12 +140,19 @@ impl Plugin for AnimationPlugin {
                     handle_stop,
                     handle_seek,
                     sync_cursor_from_player,
+                )
+                    .chain(),
+            )
+            .add_systems(
+                Update,
+                (
                     mark_timeline_dirty_on_data_change,
                     rebuild_timeline,
                     update_playhead_position,
                     update_keyframe_highlight,
                 )
-                    .chain(),
+                    .chain()
+                    .after(sync_cursor_from_player),
             );
     }
 }
