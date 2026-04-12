@@ -7,7 +7,7 @@
 //! * Body area (reserved for inline params — populated by consumer code)
 //!
 //! The node's on-screen position is driven by
-//! [`apply_node_position`](apply_node_position) reading from
+//! [`apply_node_position`] reading from
 //! [`GraphNode::position`].
 
 use bevy::prelude::*;

@@ -19,9 +19,8 @@ pub struct NodeGraph {
 
 /// Pan/zoom state for a graph's canvas viewport.
 ///
-/// Stored on the [`NodeGraph`] entity so per-graph view state persists when
-/// switching graphs. The [`canvas::apply_canvas_view`](crate::canvas) system
-/// applies `offset` and `zoom` to the canvas world node each frame.
+/// Stored on the [`NodeGraph`] entity so per-graph view state persists
+/// when switching graphs. Applied to the canvas world node each frame.
 #[derive(Component, Reflect, Clone, Debug, Serialize, Deserialize)]
 #[reflect(Component)]
 pub struct GraphCanvasView {
