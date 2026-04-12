@@ -1101,10 +1101,8 @@ pub fn handle_scrubber_click(
     event.propagate(false);
 }
 
-/// Observer: dragging across the scrubber emits a stream of
-/// [`AnimationSeek`] events so the target entity visibly follows the
-/// playhead in real time. Snaps to ticks and keyframes unless Shift
-/// is held.
+/// Dragging across the scrubber emits seek messages so the target
+/// follows the playhead in real time. Snaps unless Shift is held.
 #[allow(clippy::too_many_arguments)]
 pub fn handle_scrubber_drag(
     mut event: On<Pointer<Drag>>,

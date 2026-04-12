@@ -1,55 +1,13 @@
 //! Animation authoring and playback for the Jackdaw editor.
 //!
-//! A thin UI layer over Bevy's built-in animation framework:
-//! [`AnimationClip`], [`AnimationGraph`], and [`AnimationPlayer`]. The
-//! authored data lives in the scene AST as reflected components
-//! ([`Clip`], [`AnimationTrack`], [`Vec3Keyframe`] / [`QuatKeyframe`] /
-//! [`F32Keyframe`]) and compiles into real Bevy animation assets at
-//! runtime. Jackdaw never writes its own curve evaluator — every
-//! authored keyframe flows through Bevy's own playback path.
+//! Thin UI layer over Bevy's `AnimationClip`, `AnimationGraph`, and
+//! `AnimationPlayer`. Authored data (`Clip`, `AnimationTrack`,
+//! keyframes) lives in the scene AST and compiles into real Bevy
+//! assets at runtime. No custom curve evaluator; everything flows
+//! through Bevy's own playback path.
 //!
-//! See [`clip`] for a full table mapping each Jackdaw type to its
-//! Bevy counterpart.
-//!
-//! ## AST vs runtime
-//!
-//! **Persisted** through JSN/BSN — clips live parented to the entity
-//! they animate, which makes the target resolution structural rather
-//! than a name lookup:
-//!
-//! - [`Clip`] with `duration` + Bevy's [`Name`] component + `ChildOf`
-//!   pointing at the target entity
-//! - [`AnimationTrack`] with `(component_type_path, field_path,
-//!   interpolation)` — the target is implicit (the clip's parent)
-//! - [`Vec3Keyframe`] / [`QuatKeyframe`] / [`F32Keyframe`], one
-//!   component type per value type (not per semantic role)
-//!
-//! **Runtime-only**, rebuilt from authored data each frame:
-//!
-//! - [`CompiledClip`] — `(Handle<AnimationClip>, Handle<AnimationGraph>, AnimationNodeIndex)`
-//! - Bevy's own [`AnimationPlayer`], `AnimationGraphHandle`,
-//!   `AnimationTargetId`, `AnimatedBy` — installed on the target
-//!   entity by [`auto_bind_player`] while [`TimelineEngagement`] is
-//!   `Active`, stripped on `Idle`, and also gated by a
-//!   `bevy_animation::` skip prefix in the scene serializer as
-//!   defense-in-depth
-//!
-//! **Resources** (UI state, never saved):
-//!
-//! - [`SelectedClip`], [`TimelineCursor`], [`ActiveClipBinding`],
-//!   [`TimelineEngagement`], [`TimelineDirty`]
-//!
-//! ## Mutation path
-//!
-//! All authoring operations are plain AST edits via
-//! `jackdaw::commands::{SpawnEntity, SetJsnField, DespawnEntity}` in
-//! the main editor. The animation crate exports no custom
-//! `EditorCommand` types — see [`commands`] for the rationale.
-//!
-//! [`AnimationClip`]: bevy::animation::AnimationClip
-//! [`AnimationGraph`]: bevy::animation::graph::AnimationGraph
-//! [`AnimationPlayer`]: bevy::animation::AnimationPlayer
-//! [`Name`]: bevy::prelude::Name
+//! All mutations go through `SpawnEntity` / `SetJsnField` /
+//! `DespawnEntity`. No custom `EditorCommand` types.
 
 use bevy::prelude::*;
 
@@ -77,10 +35,9 @@ pub use player::{
 };
 pub use timeline::{
     TimelineAddKeyframeButton, TimelineClipNameInput, TimelineClipSelector,
-    TimelineCreateBlendGraphButton, TimelineCreateClipButton, TimelineDirty,
-    TimelineDurationInput, TimelineHeaderNewBlendGraphButton, TimelineHeaderNewClipButton,
-    TimelineKeyframeHandle, TimelinePanelRoot, TimelinePauseButton, TimelinePlayButton,
-    TimelineStopButton, TrackField,
+    TimelineCreateBlendGraphButton, TimelineCreateClipButton, TimelineDirty, TimelineDurationInput,
+    TimelineHeaderNewBlendGraphButton, TimelineHeaderNewClipButton, TimelineKeyframeHandle,
+    TimelinePanelRoot, TimelinePauseButton, TimelinePlayButton, TimelineStopButton, TrackField,
     clear_snap_hint_on_drag_end, handle_add_keyframe_click, handle_scrubber_click,
     handle_scrubber_drag, handle_scrubber_drag_end, handle_scrubber_drag_start,
     handle_transport_button_click, mark_timeline_dirty_on_data_change, pick_tick_step,

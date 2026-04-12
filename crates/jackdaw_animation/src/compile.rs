@@ -1,25 +1,12 @@
-//! AST → Bevy animation compile step.
+//! AST to Bevy animation compile step.
 //!
-//! For each [`Clip`] entity whose authored data changed this frame,
-//! rebuild a real [`AnimationClip`] + [`AnimationGraph`] from the
-//! `(AnimationTrack, typed-keyframe)` tree under it. The output is stored on
-//! the clip entity as a runtime-only [`CompiledClip`] component and is
-//! never serialized.
+//! Rebuilds `AnimationClip` + `AnimationGraph` from the authored
+//! track/keyframe tree whenever it changes. Output is stored as a
+//! runtime-only `CompiledClip` component, never serialized.
 //!
-//! Jackdaw never runs its own interpolator. Every keyframe hands
-//! through Bevy's `AnimatableKeyframeCurve::<T>::new` and
-//! `AnimatableCurve::new(animated_field!(...), curve)`, and Bevy's
-//! `animate_targets` system samples it on the target entity.
-//!
-//! Adding support for a new animated field is one new arm in
-//! [`build_curve_for_track`]: match on the `(component_type_path,
-//! field_path)` tuple, collect the typed keyframes, and call the
-//! right `animated_field!`. Adding support for a new value type is
-//! one new keyframe component in `clip.rs` plus a helper function
-//! here.
-//!
-//! [`AnimationClip`]: bevy::animation::AnimationClip
-//! [`AnimationGraph`]: bevy::animation::graph::AnimationGraph
+//! New animated fields: add an arm in `build_curve_for_track`.
+//! New value types: add a keyframe component in `clip.rs` plus a
+//! collector here.
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -69,7 +56,7 @@ pub struct CompiledClip {
 /// On the **first** compile of a clip, we create fresh asset handles
 /// and attach a [`CompiledClip`] component. On **subsequent** compiles,
 /// we mutate the existing `AnimationClip` asset in place so the handle
-/// stays valid — otherwise the bound target's `AnimationGraphHandle`
+/// stays valid - otherwise the bound target's `AnimationGraphHandle`
 /// would go stale after every edit.
 #[allow(clippy::too_many_arguments)]
 pub fn compile_clips(
@@ -118,7 +105,7 @@ pub fn compile_clips(
             continue;
         };
 
-        // Derive the animation target from the clip's parent — that's
+        // Derive the animation target from the clip's parent - that's
         // the entity this clip animates. Without a parent we can't
         // compile (there's no target for curves to reference).
         let Some(target_id) = target_for_clip(clip_entity, &parents, &names) else {
@@ -188,7 +175,7 @@ pub fn compile_clips(
 
 /// Compile [`AnimationBlendGraph`] clips into [`CompiledClip`] by walking
 /// the node canvas subtree and resolving it to a Bevy
-/// [`AnimationGraph`]. Runs every frame, but cheap — only walks when
+/// [`AnimationGraph`]. Runs every frame, but cheap - only walks when
 /// a blend graph clip doesn't yet have a `CompiledClip` or when its
 /// canvas contents changed.
 ///
@@ -214,7 +201,7 @@ pub fn compile_blend_graphs(
 ) {
     for (clip_entity, clip_children) in &blend_graphs {
         let Some(children) = clip_children else {
-            // No graph yet — leave any previous CompiledClip alone so
+            // No graph yet - leave any previous CompiledClip alone so
             // an already-working blend graph keeps playing while the
             // user mid-edits the canvas.
             continue;
@@ -238,7 +225,7 @@ pub fn compile_blend_graphs(
         }
 
         let Some(output_entity) = output_node else {
-            // No output node yet — user still building the graph.
+            // No output node yet - user still building the graph.
             continue;
         };
 
@@ -249,7 +236,7 @@ pub fn compile_blend_graphs(
             .copied()
             .collect();
         if incoming.len() != 1 {
-            // Zero or multiple incoming — ambiguous or incomplete.
+            // Zero or multiple incoming - ambiguous or incomplete.
             continue;
         }
         let source_node = incoming[0].source_node;
@@ -292,7 +279,7 @@ pub fn compile_blend_graphs(
 /// conversion.
 ///
 /// Runs every frame but only touches un-compiled glTF clips
-/// (`Without<CompiledClip>`) — once a clip is compiled it falls out of
+/// (`Without<CompiledClip>`) - once a clip is compiled it falls out of
 /// the query. If the Gltf asset isn't loaded yet, or the named
 /// animation can't be found, the clip is left un-compiled and the
 /// system retries next frame.
@@ -308,7 +295,7 @@ pub fn compile_gltf_clips(
 ) {
     for (clip_entity, gltf_ref) in &uncompiled {
         // Request the Gltf asset (dedup if already loading); we don't
-        // need to hold the handle — the scene's GltfSource entity
+        // need to hold the handle - the scene's GltfSource entity
         // keeps it alive.
         let handle: Handle<Gltf> = asset_server.load(&gltf_ref.gltf_path);
         let Some(gltf) = gltfs.get(&handle) else {
@@ -316,7 +303,7 @@ pub fn compile_gltf_clips(
         };
         let Some(clip_handle) = gltf.named_animations.get(gltf_ref.clip_name.as_str()) else {
             warn!(
-                "glTF clip '{}' not found in {} — available: {:?}",
+                "glTF clip '{}' not found in {} - available: {:?}",
                 gltf_ref.clip_name,
                 gltf_ref.gltf_path,
                 gltf.named_animations.keys().collect::<Vec<_>>(),
@@ -352,7 +339,7 @@ pub fn compile_gltf_clips(
 /// `animated_field!` macro with the matching concrete type. This is
 /// the one place in the codebase that bridges "string-addressed
 /// property in the AST" to "compile-time-typed curve constructor in
-/// Bevy" — every other step is generic.
+/// Bevy" - every other step is generic.
 fn build_curve_for_track(
     track: &AnimationTrack,
     target_id: AnimationTargetId,
@@ -392,7 +379,7 @@ fn build_curve_for_track(
         }
         (component, field) => {
             warn!(
-                "No compile dispatch entry for {component}.{field} — \
+                "No compile dispatch entry for {component}.{field} - \
                  add one in build_curve_for_track",
             );
             let _ = f32_keyframes; // reserved for future scalar fields
@@ -433,7 +420,7 @@ fn build_vec3_curve(mut kfs: Vec<(f32, Vec3)>) -> Option<AnimatableKeyframeCurve
     if kfs.len() == 1 {
         // Bevy's keyframe curve requires at least two samples with
         // strictly increasing times. Duplicate the single authored
-        // keyframe so the curve is a trivial constant — this is what
+        // keyframe so the curve is a trivial constant - this is what
         // lets scrubbing show the authored value at all times while
         // the user is still building up the track.
         let (t, v) = kfs[0];
@@ -457,7 +444,7 @@ fn build_quat_curve(mut kfs: Vec<(f32, Quat)>) -> Option<AnimatableKeyframeCurve
 ///
 /// Always reads from the authored [`Clip::duration`] field rather than
 /// deriving from keyframes. This keeps the timeline's visual range
-/// stable as the user edits — a new keyframe lands at the cursor
+/// stable as the user edits - a new keyframe lands at the cursor
 /// position instead of at the visual right edge, which is what would
 /// happen if the duration grew to match every new keyframe time.
 pub fn clip_display_duration(

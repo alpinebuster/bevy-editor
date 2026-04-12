@@ -1,26 +1,10 @@
 //! Per-property "animate" diamond on inspector field rows.
 //!
-//! Watches newly-spawned [`FieldBinding`] components and, for the
-//! animatable allowlist of `(component_type_path, field_path)` pairs,
-//! appends a small diamond icon button next to the row. Clicking the
-//! diamond finds-or-creates a [`jackdaw_animation::Clip`] child of the
-//! field's source entity, finds-or-creates an [`AnimationTrack`] for the
-//! bound property under that clip, and spawns the correct typed
-//! keyframe at the current cursor time.
-//!
-//! This is the Blender/Godot "hold I over a property to insert a
-//! keyframe" flow, adapted to Jackdaw's BSN-first model — every
-//! operation goes through `world.spawn` / `world.get_mut` on reflected
-//! components, and the resulting clip round-trips through JSN.
-//!
-//! The allowlist currently covers Transform's three fields; adding a
-//! new animatable property means one new entry in
-//! [`ANIMATABLE_FIELDS`] plus matching arms in [`spawn_typed_keyframe`]
-//! and in `jackdaw_animation::compile::build_curve_for_track`.
-//!
-//! [`FieldBinding`]: super::FieldBinding
-//! [`jackdaw_animation::Clip`]: jackdaw_animation::Clip
-//! [`AnimationTrack`]: jackdaw_animation::AnimationTrack
+//! Adds a diamond button next to animatable fields (see
+//! `ANIMATABLE_FIELDS`). Clicking it finds-or-creates a clip + track
+//! and spawns a keyframe at the cursor time. New animatable properties
+//! need one entry in `ANIMATABLE_FIELDS` plus matching arms in
+//! `spawn_typed_keyframe` and `compile::build_curve_for_track`.
 
 use bevy::prelude::*;
 use jackdaw_animation::{
@@ -32,12 +16,7 @@ use jackdaw_feathers::icons::Icon;
 
 use super::InspectorFieldRow;
 
-/// Epsilon (in seconds) for "is the cursor on this keyframe?".
-/// Roughly one frame at 60fps — anything closer than this to an
-/// existing keyframe time counts as "you're on it." Tight enough
-/// that the user has to deliberately land on a keyframe for the
-/// amber state to appear; loose enough to not demand floating-point
-/// exactness.
+/// Epsilon for "is the cursor on this keyframe?" (~1 frame at 60fps).
 const CURSOR_ON_KEYFRAME_EPS: f32 = 0.02;
 
 const TRANSFORM: &str = "bevy_transform::components::transform::Transform";
@@ -150,7 +129,7 @@ pub fn on_diamond_click(
         let clip_entity = find_or_create_clip(world, source_entity);
         let Some(clip_entity) = clip_entity else {
             warn!(
-                "Diamond click: source entity {source_entity} has no Name — \
+                "Diamond click: source entity {source_entity} has no Name - \
                  give it one in the inspector first so the clip's target can \
                  resolve"
             );
@@ -212,7 +191,7 @@ fn find_or_create_clip(world: &mut World, source_entity: Entity) -> Option<Entit
         }
     }
 
-    // None exist — spawn one as a child of the source.
+    // None exist - spawn one as a child of the source.
     let clip = world
         .spawn((
             Clip::default(),
@@ -324,9 +303,9 @@ enum DiamondState {
     /// The diamond reads "click me to start animating this."
     NoTrack,
     /// A track exists and has keyframes, but the cursor isn't
-    /// sitting on any of them — clicking adds a new keyframe.
+    /// sitting on any of them - clicking adds a new keyframe.
     HasTrack,
-    /// The cursor is exactly on an existing keyframe — clicking
+    /// The cursor is exactly on an existing keyframe - clicking
     /// would replace it (currently spawns a duplicate, but the
     /// compile step dedupes on time).
     OnKeyframe,
@@ -362,14 +341,14 @@ pub fn update_anim_diamond_highlights(
             cursor.seek_time,
         );
         let color = match state {
-            // Dim and slightly transparent — the field isn't
+            // Dim and slightly transparent - the field isn't
             // animated yet. Still clickable, just unobtrusive.
             DiamondState::NoTrack => Color::srgba(0.55, 0.55, 0.55, 0.65),
-            // Accent blue — matches the track strip diamonds in
+            // Accent blue - matches the track strip diamonds in
             // the timeline. "There's a track here; click to add a
             // keyframe at the current cursor time."
             DiamondState::HasTrack => Color::srgb(0.38, 0.72, 1.0),
-            // Amber — "you're standing on an existing keyframe."
+            // Amber - "you're standing on an existing keyframe."
             // Same color the timeline widget uses for selected
             // keyframes, so the visual language is consistent.
             DiamondState::OnKeyframe => Color::srgb(1.0, 0.78, 0.12),
@@ -377,7 +356,7 @@ pub fn update_anim_diamond_highlights(
 
         // The feathers `button()` bundle spawns an icon child
         // (`Text` + `TextFont`) via `setup_button`. Walk the
-        // button's children and recolor any text nodes we find —
+        // button's children and recolor any text nodes we find -
         // there should be exactly one (the Diamond glyph).
         recolor_button_icon(btn_entity, color, &children_query, &mut text_colors);
     }

@@ -1,20 +1,7 @@
-//! Transport + target adoption. Watches the selected clip and wires up
-//! the target entity with the runtime components Bevy needs —
-//! [`AnimationPlayer`], [`AnimationGraphHandle`], [`AnimationTargetId`],
-//! [`AnimatedBy`] — so Bevy samples the curve automatically. Play,
-//! pause, seek, and stop then drive through Bevy's own API.
-//!
-//! None of the runtime components are persisted to the AST. They're
-//! installed when a clip is bound to its target and stripped when the
-//! selection changes; the scene serializer's skip prefix for
-//! `bevy_animation::` is a defense-in-depth against any future registry
-//! changes. The only authored data is the clip + tracks + keyframes
-//! from `clip.rs`.
-//!
-//! [`AnimationPlayer`]: bevy::animation::AnimationPlayer
-//! [`AnimationGraphHandle`]: bevy::animation::graph::AnimationGraphHandle
-//! [`AnimationTargetId`]: bevy::animation::AnimationTargetId
-//! [`AnimatedBy`]: bevy::animation::AnimatedBy
+//! Transport and target adoption. Installs/strips Bevy's runtime
+//! animation components (`AnimationPlayer`, `AnimationGraphHandle`,
+//! `AnimationTargetId`, `AnimatedBy`) based on engagement state.
+//! None of these are persisted.
 
 use bevy::animation::{
     AnimatedBy, AnimationPlayer, AnimationTargetId, graph::AnimationGraphHandle,
@@ -25,11 +12,9 @@ use crate::blend_graph::{AnimationBlendGraph, ClipNodeRef, OutputNode};
 use crate::clip::{Clip, GltfClipRef, SelectedClip};
 use crate::compile::{CompiledClip, clip_display_duration};
 
-/// Distinguishes whether [`auto_bind_player`] installed the full
-/// runtime component stack (authored case) or just an
-/// [`AnimationGraphHandle`] on top of Bevy's glTF-loader-installed
-/// [`AnimationPlayer`] (glTF case). Strip reads this to remove only
-/// what it installed.
+/// Whether `auto_bind_player` installed the full runtime stack
+/// (authored) or just `AnimationGraphHandle` (glTF). Controls what
+/// strip removes.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BindMode {
     #[default]
@@ -37,23 +22,9 @@ pub enum BindMode {
     Gltf,
 }
 
-/// The (clip, target) pair whose runtime `AnimationPlayer` is
-/// currently installed on the target entity.
-///
-/// Named after Bevy's [`ActiveAnimation`]: an "active animation target"
-/// is the entity that's being driven by the editor right now. The
-/// [`auto_bind_player`] system consults this resource to decide
-/// whether to strip stale runtime components before installing new
-/// ones. A resource rather than a component because there's only ever
-/// one active target at a time in the Phase 5A single-entity model.
-///
-/// `target` is the entity currently hosting the runtime components
-/// Jackdaw installed — for authored clips that's the clip's parent,
-/// and for glTF clips that's the descendant with Bevy's pre-installed
-/// [`AnimationPlayer`]. Strip removes from wherever is stored here.
-///
-/// [`ActiveAnimation`]: bevy::animation::ActiveAnimation
-/// [`auto_bind_player`]: crate::auto_bind_player
+/// Which (clip, host entity) pair currently has runtime animation
+/// components installed. `target` is the entity that received the
+/// install; `mode` controls what to strip.
 #[derive(Resource, Default, Debug, Clone, Copy)]
 pub struct ActiveClipBinding {
     pub clip: Option<Entity>,
@@ -61,16 +32,9 @@ pub struct ActiveClipBinding {
     pub mode: BindMode,
 }
 
-/// Whether the user is currently driving the selected clip. The target
-/// entity's runtime animation components (`AnimationPlayer`, etc.) are
-/// only installed while engagement is `Active`. In `Idle` the target
-/// is free to edit like any other scene entity — gizmo drag, inspector
-/// fields, manual Transform edits all work normally.
-///
-/// Transitions:
-/// - `Idle → Active`: scrubber drag start, or Play button pressed
-/// - `Active → Idle`: scrubber drag end, or Pause/Stop pressed, or
-///   selection changes (handled implicitly by re-binding)
+/// Whether runtime animation components are installed on the target.
+/// `Active` during scrub/play; `Idle` otherwise so the target's
+/// Transform is freely editable.
 #[derive(Resource, Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimelineEngagement {
     #[default]
@@ -78,28 +42,11 @@ pub enum TimelineEngagement {
     Active,
 }
 
-/// Shared timeline state for the editor's transport bar. The widget writes
-/// into this resource; the transport systems read it and drive Bevy.
-///
-/// Field naming matches Bevy's [`ActiveAnimation`] where there's overlap:
-/// `seek_time` is the same concept as [`ActiveAnimation::seek_time`].
-/// Moving between editor code and Bevy code is a literal copy.
-///
-/// [`ActiveAnimation`]: bevy::animation::ActiveAnimation
-/// [`ActiveAnimation::seek_time`]: bevy::animation::ActiveAnimation::seek_time
+/// Editor playhead state. `seek_time` mirrors Bevy's
+/// `ActiveAnimation::seek_time`.
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct TimelineCursor {
-    /// Playhead time in seconds from the clip start. Mirrors
-    /// [`ActiveAnimation::seek_time`] while a clip is bound.
-    ///
-    /// [`ActiveAnimation::seek_time`]: bevy::animation::ActiveAnimation::seek_time
     pub seek_time: f32,
-    /// True while the transport is actively playing. Set by `AnimationPlay`,
-    /// cleared by `AnimationPause`/`AnimationStop`. This is the inverse
-    /// of Bevy's [`ActiveAnimation::is_paused`] — see [`Self::is_paused`]
-    /// for the Bevy-aligned accessor.
-    ///
-    /// [`ActiveAnimation::is_paused`]: bevy::animation::ActiveAnimation::is_paused
     pub is_playing: bool,
 }
 
@@ -113,57 +60,33 @@ impl Default for TimelineCursor {
 }
 
 impl TimelineCursor {
-    /// Matches Bevy's [`ActiveAnimation::is_paused`]: returns `true`
-    /// when transport is currently stopped / paused. Editor code can
-    /// use either `!cursor.is_playing` or `cursor.is_paused()`
-    /// depending on which reads more naturally at the call site.
-    ///
-    /// [`ActiveAnimation::is_paused`]: bevy::animation::ActiveAnimation::is_paused
     #[inline]
     pub fn is_paused(&self) -> bool {
         !self.is_playing
     }
 }
 
-/// User pressed Play on the timeline. Ensures runtime components are
-/// present on the target and starts playback from the current cursor.
+/// Play transport message.
 #[derive(Message, Debug, Clone, Copy)]
 pub struct AnimationPlay;
 
-/// User pressed Pause. Leaves the active animation in place so Resume is
-/// cheap.
+/// Pause transport message.
 #[derive(Message, Debug, Clone, Copy)]
 pub struct AnimationPause;
 
-/// User pressed Stop. Clears active animations and rewinds the cursor.
+/// Stop transport message. Rewinds the cursor to 0.
 #[derive(Message, Debug, Clone, Copy)]
 pub struct AnimationStop;
 
-/// User dragged the playhead to a specific time. Updates the cursor and,
-/// if an active animation exists, seeks it there.
+/// Seek transport message. Sets cursor to the given time.
 #[derive(Message, Debug, Clone, Copy)]
 pub struct AnimationSeek(pub f32);
 
-/// Install or strip the runtime animation components on the clip's
-/// target entity based on [`TimelineEngagement`]. Only installs while
-/// engagement is `Active` (scrubbing or playing). In `Idle` the target
-/// is stripped, leaving its Transform freely editable via gizmos or
-/// the inspector — otherwise Bevy's `animate_targets` would clobber
-/// every manual edit with the sampled curve value.
-///
-/// Re-binds eagerly when either the selection or the engagement
-/// changes, so transitioning Idle → Active → Idle within a few frames
-/// (the scrub-drag case) still works.
-///
-/// ## glTF case
-///
-/// When the selected clip has a [`GltfClipRef`], Bevy's glTF loader
-/// has already installed an `AnimationPlayer` (and matching
-/// `AnimationTarget` components on bone descendants) inside the
-/// scene. We find the first descendant of the clip's parent that has
-/// that player and install only our [`AnimationGraphHandle`] on it —
-/// leaving Bevy's player, targets, and `AnimatedBy` pointers
-/// untouched. Strip removes only the graph handle.
+/// Install or strip runtime animation components based on
+/// `TimelineEngagement`. Active = install; Idle = strip so the
+/// target's Transform is freely editable. For glTF clips, only
+/// the `AnimationGraphHandle` is installed/stripped (Bevy's loader
+/// already placed the player and targets).
 #[allow(clippy::too_many_arguments)]
 pub fn auto_bind_player(
     selected: Res<SelectedClip>,
@@ -186,7 +109,7 @@ pub fn auto_bind_player(
     let currently_bound = bound.target.is_some() && bound.clip == selected.0;
 
     if want_bound == currently_bound && !want_bound {
-        // Idle and already stripped — nothing to do.
+        // Idle and already stripped - nothing to do.
         return;
     }
     if want_bound && currently_bound {
@@ -334,7 +257,7 @@ pub fn auto_bind_player(
 
 /// Walk a blend graph's single `ClipRef → Output` connection to
 /// find the `Entity` of the clip being passed through. Matches the
-/// MVP scope of [`compile_blend_graphs`] — only "one clip ref, one
+/// MVP scope of [`compile_blend_graphs`] - only "one clip ref, one
 /// output, one connection between them" is recognized. Returns
 /// `None` if the graph is empty, incomplete, or uses a topology the
 /// compile step can't handle yet.
@@ -460,7 +383,7 @@ pub fn handle_stop(
     }
     cursor.seek_time = 0.0;
     cursor.is_playing = false;
-    // Drop engagement to Idle — auto_bind_player will strip the
+    // Drop engagement to Idle - auto_bind_player will strip the
     // runtime components on the next frame, releasing the target so
     // the user can edit its Transform via gizmos again.
     *engagement = TimelineEngagement::Idle;
