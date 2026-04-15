@@ -1533,16 +1533,14 @@ pub fn inspector_components_content(icon_font: Handle<Font>) -> impl Bundle {
                         },
                         BackgroundColor(tokens::ELEVATED_BG),
                         observe(
-                            |hover: On<Pointer<Over>>,
-                             mut bg: Query<&mut BackgroundColor>| {
+                            |hover: On<Pointer<Over>>, mut bg: Query<&mut BackgroundColor>| {
                                 if let Ok(mut bg) = bg.get_mut(hover.event_target()) {
                                     bg.0 = tokens::TOOLBAR_ACTIVE_BG;
                                 }
                             },
                         ),
                         observe(
-                            |out: On<Pointer<Out>>,
-                             mut bg: Query<&mut BackgroundColor>| {
+                            |out: On<Pointer<Out>>, mut bg: Query<&mut BackgroundColor>| {
                                 if let Ok(mut bg) = bg.get_mut(out.event_target()) {
                                     bg.0 = tokens::ELEVATED_BG;
                                 }
@@ -1568,15 +1566,11 @@ pub fn inspector_components_content(icon_font: Handle<Font>) -> impl Bundle {
                                 TextColor(tokens::TEXT_PRIMARY),
                             ),
                         ],
-                        observe(
-                            |click: On<Pointer<Click>>, mut commands: Commands| {
-                                commands.trigger(
-                                    jackdaw_feathers::button::ButtonClickEvent {
-                                        entity: click.event_target(),
-                                    },
-                                );
-                            },
-                        ),
+                        observe(|click: On<Pointer<Click>>, mut commands: Commands| {
+                            commands.trigger(jackdaw_feathers::button::ButtonClickEvent {
+                                entity: click.event_target(),
+                            });
+                        },),
                     ),
                 ],
             ),

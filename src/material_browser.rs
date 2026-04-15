@@ -1357,10 +1357,16 @@ fn update_material_browser_ui(
     }
 
     let Ok((grid_entity, grid_children)) = grid_query.single() else {
-        info!("update_material_browser_ui: no MaterialBrowserGrid entity found, {} entries in registry", registry.entries.len());
+        info!(
+            "update_material_browser_ui: no MaterialBrowserGrid entity found, {} entries in registry",
+            registry.entries.len()
+        );
         return;
     };
-    info!("update_material_browser_ui: rebuilding with {} entries", registry.entries.len());
+    info!(
+        "update_material_browser_ui: rebuilding with {} entries",
+        registry.entries.len()
+    );
 
     if let Some(children) = grid_children {
         for child in children.iter() {

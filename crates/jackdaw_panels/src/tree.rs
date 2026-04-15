@@ -622,10 +622,16 @@ mod tests {
         let mut t = DockTree::new();
         let root = t.set_root_leaf(leaf("root", &["a", "b"]));
         t.set_active(root, "b");
-        assert_eq!(t.nodes[&root].as_leaf().unwrap().active.as_deref(), Some("b"));
+        assert_eq!(
+            t.nodes[&root].as_leaf().unwrap().active.as_deref(),
+            Some("b")
+        );
         // Non-member window is a no-op.
         t.set_active(root, "z");
-        assert_eq!(t.nodes[&root].as_leaf().unwrap().active.as_deref(), Some("b"));
+        assert_eq!(
+            t.nodes[&root].as_leaf().unwrap().active.as_deref(),
+            Some("b")
+        );
     }
 
     #[test]

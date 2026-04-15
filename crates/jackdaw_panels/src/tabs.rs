@@ -26,11 +26,7 @@ impl Plugin for DockTabPlugin {
     }
 }
 
-pub fn spawn_tab_bar_world(
-    world: &mut World,
-    area_entity: Entity,
-    tabs: &[(String, String)],
-) {
+pub fn spawn_tab_bar_world(world: &mut World, area_entity: Entity, tabs: &[(String, String)]) {
     let first_id = tabs.first().map(|(id, _)| id.clone());
 
     let tab_bar = world
@@ -86,9 +82,7 @@ pub fn spawn_tab_bar_world(
         spawn_tab(world, tab_row, window_id, label, is_active);
     }
 
-    let icon_font = world
-        .get_resource::<IconFont>()
-        .map(|f| f.0.clone());
+    let icon_font = world.get_resource::<IconFont>().map(|f| f.0.clone());
 
     let right_row = world
         .spawn((
@@ -160,17 +154,23 @@ pub fn spawn_tab_in_world(
     spawn_tab(world, tab_row, window_id, label, is_active);
 }
 
-fn spawn_tab(
-    world: &mut World,
-    tab_row: Entity,
-    window_id: &str,
-    label: &str,
-    is_active: bool,
-) {
-    let tab_bg = if is_active { tokens::TAB_ACTIVE_BG } else { Color::NONE };
+fn spawn_tab(world: &mut World, tab_row: Entity, window_id: &str, label: &str, is_active: bool) {
+    let tab_bg = if is_active {
+        tokens::TAB_ACTIVE_BG
+    } else {
+        Color::NONE
+    };
     let border_top = if is_active { Val::Px(2.0) } else { Val::ZERO };
-    let border_color = if is_active { tokens::TAB_ACTIVE_BORDER } else { Color::NONE };
-    let text_color = if is_active { tokens::TEXT_PRIMARY } else { tokens::TAB_INACTIVE_TEXT };
+    let border_color = if is_active {
+        tokens::TAB_ACTIVE_BORDER
+    } else {
+        Color::NONE
+    };
+    let text_color = if is_active {
+        tokens::TEXT_PRIMARY
+    } else {
+        tokens::TAB_INACTIVE_TEXT
+    };
 
     let tab_entity = world
         .spawn((
@@ -210,9 +210,7 @@ fn spawn_tab(
         ChildOf(tab_entity),
     ));
 
-    let icon_font = world
-        .get_resource::<IconFont>()
-        .map(|f| f.0.clone());
+    let icon_font = world.get_resource::<IconFont>().map(|f| f.0.clone());
 
     if let Some(font_handle) = icon_font {
         world.spawn((

@@ -31,7 +31,12 @@ impl Default for AreaState {
 pub fn capture_layout_state(world: &mut World) -> LayoutState {
     let mut state = LayoutState::default();
 
-    let mut area_query = world.query::<(Entity, &DockArea, Option<&ActiveDockWindow>, Option<&crate::Panel>)>();
+    let mut area_query = world.query::<(
+        Entity,
+        &DockArea,
+        Option<&ActiveDockWindow>,
+        Option<&crate::Panel>,
+    )>();
     let areas: Vec<(Entity, String, Option<String>, f32)> = area_query
         .iter(world)
         .map(|(e, a, active, panel)| {

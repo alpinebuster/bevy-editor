@@ -108,7 +108,13 @@ pub fn populate_workspace_tabs(world: &mut World) {
 
     for strip_entity in strips {
         for workspace in registry.iter() {
-            spawn_workspace_tab(world, strip_entity, workspace, &registry, icon_font.as_ref());
+            spawn_workspace_tab(
+                world,
+                strip_entity,
+                workspace,
+                &registry,
+                icon_font.as_ref(),
+            );
         }
         spawn_add_workspace_button(world, strip_entity, icon_font.as_ref());
     }
@@ -125,7 +131,11 @@ fn spawn_workspace_tab(
     icon_font: Option<&Handle<Font>>,
 ) {
     let is_active = registry.active.as_ref() == Some(&workspace.id);
-    let bg = if is_active { TAB_ACTIVE_BG } else { Color::NONE };
+    let bg = if is_active {
+        TAB_ACTIVE_BG
+    } else {
+        Color::NONE
+    };
     let border = if is_active {
         TAB_ACTIVE_BORDER
     } else {
@@ -232,11 +242,7 @@ fn spawn_workspace_tab(
     }
 }
 
-fn spawn_add_workspace_button(
-    world: &mut World,
-    strip: Entity,
-    icon_font: Option<&Handle<Font>>,
-) {
+fn spawn_add_workspace_button(world: &mut World, strip: Entity, icon_font: Option<&Handle<Font>>) {
     let btn = world
         .spawn((
             AddWorkspaceButton,
@@ -363,10 +369,7 @@ pub fn handle_add_workspace_clicks(
         }
 
         let old = registry.active.clone();
-        commands.trigger(WorkspaceChanged {
-            old,
-            new: new_id,
-        });
+        commands.trigger(WorkspaceChanged { old, new: new_id });
     }
 }
 
@@ -560,9 +563,7 @@ pub fn handle_workspace_rename_commit(
         if let Some(ws) = registry.get_mut(&workspace_id) {
             ws.name = new_name.clone();
         }
-        commands
-            .entity(label_entity)
-            .insert(Text::new(new_name));
+        commands.entity(label_entity).insert(Text::new(new_name));
     }
 
     // Restore label visibility and despawn the rename input.
@@ -622,7 +623,11 @@ pub fn update_workspace_tab_visuals(
         let is_active = registry.active.as_ref() == Some(&tab.workspace_id);
 
         if let Ok(mut bg) = bg_query.get_mut(tab_entity) {
-            bg.0 = if is_active { TAB_ACTIVE_BG } else { Color::NONE };
+            bg.0 = if is_active {
+                TAB_ACTIVE_BG
+            } else {
+                Color::NONE
+            };
         }
         if let Ok(mut bc) = border_query.get_mut(tab_entity) {
             *bc = BorderColor::all(if is_active {

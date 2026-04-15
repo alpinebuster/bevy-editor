@@ -13,9 +13,7 @@
 use bevy::prelude::*;
 use jackdaw_feathers::tokens;
 
-use crate::area::{
-    ActiveDockWindow, DockArea, DockAreaStyle, DockTab, DockTabContent, DockWindow,
-};
+use crate::area::{ActiveDockWindow, DockArea, DockAreaStyle, DockTab, DockTabContent, DockWindow};
 use crate::registry::WindowRegistry;
 use crate::sidebar::{self, DockSidebarIcon};
 use crate::split::{Panel, PanelGroup, PanelHandle};
@@ -40,12 +38,7 @@ impl Plugin for ReconcilePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DockTree>().add_systems(
             Update,
-            (
-                seed_anchors_from_hosts,
-                reconcile_tree,
-                sync_leaf_visuals,
-            )
-                .chain(),
+            (seed_anchors_from_hosts, reconcile_tree, sync_leaf_visuals).chain(),
         );
     }
 }
@@ -136,10 +129,7 @@ fn reconcile_at(world: &mut World, entity: Entity, node_id: NodeId) {
 }
 
 fn reconcile_leaf(world: &mut World, entity: Entity, node_id: NodeId, leaf: &DockLeaf) {
-    let current_binding = world
-        .entity(entity)
-        .get::<NodeBinding>()
-        .map(|b| b.0);
+    let current_binding = world.entity(entity).get::<NodeBinding>().map(|b| b.0);
     let was_split = world.entity(entity).contains::<PanelGroup>();
     let current_windows = collect_content_window_ids(world, entity);
 
@@ -182,10 +172,7 @@ fn reconcile_leaf(world: &mut World, entity: Entity, node_id: NodeId, leaf: &Doc
 }
 
 fn reconcile_split(world: &mut World, entity: Entity, node_id: NodeId, split: &DockSplit) {
-    let current_binding = world
-        .entity(entity)
-        .get::<NodeBinding>()
-        .map(|b| b.0);
+    let current_binding = world.entity(entity).get::<NodeBinding>().map(|b| b.0);
 
     let mut children = collect_split_children(world, entity);
     let needs_rebuild = current_binding != Some(node_id) || children.is_none();
@@ -202,7 +189,9 @@ fn reconcile_split(world: &mut World, entity: Entity, node_id: NodeId, split: &D
             };
         }
         if !world.entity(entity).contains::<PanelGroup>() {
-            world.entity_mut(entity).insert(PanelGroup { min_ratio: 0.05 });
+            world
+                .entity_mut(entity)
+                .insert(PanelGroup { min_ratio: 0.05 });
         }
 
         let child_node = || Node {
@@ -215,7 +204,9 @@ fn reconcile_split(world: &mut World, entity: Entity, node_id: NodeId, split: &D
 
         let child_a = world
             .spawn((
-                Panel { ratio: split.fraction },
+                Panel {
+                    ratio: split.fraction,
+                },
                 child_node(),
                 BackgroundColor(tokens::PANEL_BG),
                 ChildOf(entity),
@@ -236,7 +227,9 @@ fn reconcile_split(world: &mut World, entity: Entity, node_id: NodeId, split: &D
             .id();
         let child_b = world
             .spawn((
-                Panel { ratio: 1.0 - split.fraction },
+                Panel {
+                    ratio: 1.0 - split.fraction,
+                },
                 child_node(),
                 BackgroundColor(tokens::PANEL_BG),
                 ChildOf(entity),
@@ -263,6 +256,14 @@ fn reconcile_split(world: &mut World, entity: Entity, node_id: NodeId, split: &D
     reconcile_at(world, child_b, split.b);
 
     world.entity_mut(entity).insert(NodeBinding(node_id));
+
+    // A split always has visible leaf children beneath it, so the
+    // container itself must be visible. If the host had been collapsed
+    // (Display::None + zero geometry) while it was previously an empty
+    // leaf, restore it here — otherwise its freshly-reconciled children
+    // render inside a zero-sized hidden parent and the whole subtree is
+    // invisible.
+    set_host_visible(world, entity, true);
 }
 
 fn spawn_leaf_ui(world: &mut World, entity: Entity, leaf: &DockLeaf) {
@@ -347,10 +348,7 @@ fn collect_content_window_ids(world: &mut World, entity: Entity) -> Vec<String> 
 
 /// If `entity` currently looks like a split host (PanelGroup with three
 /// children: panel, handle, panel), return them in order.
-fn collect_split_children(
-    world: &mut World,
-    entity: Entity,
-) -> Option<(Entity, Entity, Entity)> {
+fn collect_split_children(world: &mut World, entity: Entity) -> Option<(Entity, Entity, Entity)> {
     let children: Vec<Entity> = world
         .entity(entity)
         .get::<Children>()
@@ -374,7 +372,11 @@ fn collect_split_children(
 /// Show or hide a host entity and its adjacent `PanelHandle` sibling so
 /// an empty anchor doesn't leave a stub panel + dangling resize handle.
 fn set_host_visible(world: &mut World, entity: Entity, visible: bool) {
-    let target = if visible { Display::Flex } else { Display::None };
+    let target = if visible {
+        Display::Flex
+    } else {
+        Display::None
+    };
 
     // Find the adjacent PanelHandle sibling (index ±1 in the parent's
     // children) so we can hide/show it alongside the host.
@@ -452,7 +454,10 @@ fn set_host_visible(world: &mut World, entity: Entity, visible: bool) {
     // Bevy 0.18 `set_changed` through `EntityWorldMut::get_mut` doesn't
     // reliably flag `Changed<Panel>` for filter queries in later
     // systems.
-    #[allow(clippy::almost_swapped, reason = "intentional DerefMut to bump change tick")]
+    #[allow(
+        clippy::almost_swapped,
+        reason = "intentional DerefMut to bump change tick"
+    )]
     if any_changed {
         if let Some(mut panel) = world
             .entity_mut(entity)

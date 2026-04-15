@@ -278,8 +278,7 @@ fn on_drag_move(
                 }
 
                 let size = computed.size() * computed.inverse_scale_factor();
-                let (_scale, _angle, center) =
-                    ui_transform.to_scale_angle_translation();
+                let (_scale, _angle, center) = ui_transform.to_scale_angle_translation();
                 let top_left = center - size / 2.0;
 
                 let rel = cursor - top_left;
@@ -304,8 +303,7 @@ fn on_drag_move(
                         edge,
                     });
 
-                    let (overlay_pos, overlay_size) =
-                        edge_overlay_rect(top_left, size, edge);
+                    let (overlay_pos, overlay_size) = edge_overlay_rect(top_left, size, edge);
                     let overlay = commands
                         .spawn((
                             DropOverlay,
@@ -319,9 +317,7 @@ fn on_drag_move(
                                 border_radius: BorderRadius::all(Val::Px(4.0)),
                                 ..default()
                             },
-                            BackgroundColor(
-                                Color::srgba(0.126, 0.431, 0.784, 0.25),
-                            ),
+                            BackgroundColor(Color::srgba(0.126, 0.431, 0.784, 0.25)),
                             BorderColor::all(tokens::ACCENT_BLUE),
                             GlobalZIndex(150),
                         ))
@@ -343,9 +339,7 @@ fn on_drag_move(
                                 border_radius: BorderRadius::all(Val::Px(4.0)),
                                 ..default()
                             },
-                            BackgroundColor(
-                                Color::srgba(0.126, 0.431, 0.784, 0.12),
-                            ),
+                            BackgroundColor(Color::srgba(0.126, 0.431, 0.784, 0.12)),
                             BorderColor::all(tokens::ACCENT_BLUE),
                             GlobalZIndex(150),
                         ))
@@ -366,8 +360,7 @@ fn on_drag_move(
                     }
 
                     let size = computed.size() * computed.inverse_scale_factor();
-                    let (_scale, _angle, center) =
-                        ui_transform.to_scale_angle_translation();
+                    let (_scale, _angle, center) = ui_transform.to_scale_angle_translation();
                     let top_left = center - size / 2.0;
 
                     let rel = cursor - top_left;
@@ -399,8 +392,7 @@ fn on_drag_move(
                         edge,
                     });
 
-                    let (overlay_pos, overlay_size) =
-                        edge_overlay_rect(top_left, size, edge);
+                    let (overlay_pos, overlay_size) = edge_overlay_rect(top_left, size, edge);
                     let overlay = commands
                         .spawn((
                             DropOverlay,
@@ -414,9 +406,7 @@ fn on_drag_move(
                                 border_radius: BorderRadius::all(Val::Px(4.0)),
                                 ..default()
                             },
-                            BackgroundColor(
-                                Color::srgba(0.126, 0.431, 0.784, 0.25),
-                            ),
+                            BackgroundColor(Color::srgba(0.126, 0.431, 0.784, 0.25)),
                             BorderColor::all(tokens::ACCENT_BLUE),
                             GlobalZIndex(150),
                         ))
@@ -523,11 +513,7 @@ fn cancel_drag_on_escape(
 
 /// Move `window_id` into the leaf bound to `target_area`.
 fn drop_on_area(world: &mut World, window_id: &str, target_area: Entity) {
-    let Some(binding) = world
-        .entity(target_area)
-        .get::<NodeBinding>()
-        .copied()
-    else {
+    let Some(binding) = world.entity(target_area).get::<NodeBinding>().copied() else {
         return;
     };
     world
@@ -538,11 +524,7 @@ fn drop_on_area(world: &mut World, window_id: &str, target_area: Entity) {
 /// Split the leaf bound to `target_area` along `edge` and place
 /// `window_id` into the new sibling.
 fn drop_on_edge(world: &mut World, window_id: &str, target_area: Entity, edge: DropEdge) {
-    let Some(binding) = world
-        .entity(target_area)
-        .get::<NodeBinding>()
-        .copied()
-    else {
+    let Some(binding) = world.entity(target_area).get::<NodeBinding>().copied() else {
         return;
     };
     let tree_edge = match edge {
@@ -561,12 +543,7 @@ fn drop_on_edge(world: &mut World, window_id: &str, target_area: Entity, edge: D
 /// first leaf is empty (collapsed panel), the window is added to it so
 /// the reconciler un-hides the host next tick. Otherwise the leaf is
 /// split at `edge` to create a sibling leaf holding the window.
-fn drop_on_viewport_edge(
-    world: &mut World,
-    window_id: &str,
-    anchor_id: &str,
-    edge: DropEdge,
-) {
+fn drop_on_viewport_edge(world: &mut World, window_id: &str, anchor_id: &str, edge: DropEdge) {
     let mut tree = world.resource_mut::<DockTree>();
     let Some(root) = tree.anchor(anchor_id) else {
         return;

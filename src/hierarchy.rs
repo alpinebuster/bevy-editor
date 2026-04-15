@@ -62,10 +62,7 @@ impl Plugin for HierarchyPlugin {
             .init_resource::<PendingTemplateDefaultName>()
             .init_resource::<HierarchyShowAll>()
             .add_systems(Startup, setup_tree_node_expanded_watcher)
-            .add_systems(
-                OnEnter(crate::AppState::Editor),
-                setup_name_watcher,
-            )
+            .add_systems(OnEnter(crate::AppState::Editor), setup_name_watcher)
             .add_observer(rebuild_hierarchy_on_container_added)
             .add_systems(
                 Update,

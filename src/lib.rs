@@ -147,7 +147,14 @@ impl Plugin for EditorPlugin {
             .add_plugins(jackdaw_node_graph::NodeGraphPlugin)
             .add_plugins(jackdaw_animation::AnimationPlugin)
             .add_plugins(jackdaw_panels::DockPlugin)
-            .add_systems(Startup, (register_all_dock_windows, register_workspaces, sync_icon_font))
+            .add_systems(
+                Startup,
+                (
+                    register_all_dock_windows,
+                    register_workspaces,
+                    sync_icon_font,
+                ),
+            )
             .configure_sets(
                 Update,
                 EditorInteraction
@@ -197,8 +204,7 @@ impl Plugin for EditorPlugin {
             .add_observer(on_clip_selector_change)
             .add_observer(on_clip_name_commit)
             .add_observer(on_duration_input_commit)
-            .add_observer(on_timeline_keyframe_click)
-;
+            .add_observer(on_timeline_keyframe_click);
     }
 }
 
@@ -2270,12 +2276,9 @@ fn init_layout(world: &mut World) {
             serde_json::from_value::<jackdaw_panels::WorkspacesPersist>(json.clone())
         {
             if !persist.workspaces.is_empty() {
-                let mut registry =
-                    world.resource_mut::<jackdaw_panels::WorkspaceRegistry>();
+                let mut registry = world.resource_mut::<jackdaw_panels::WorkspaceRegistry>();
                 persist.apply_to_registry(&mut registry);
-                let active_tree = registry
-                    .active_workspace()
-                    .map(|w| w.tree.clone());
+                let active_tree = registry.active_workspace().map(|w| w.tree.clone());
                 drop(registry);
                 if let Some(tree) = active_tree {
                     world.insert_resource(tree);
@@ -2339,11 +2342,8 @@ fn open_window_in_default_area(world: &mut World, window_id: &str) {
         .map(|l| l.windows.iter().any(|w| w == window_id))
         .unwrap_or(false);
 
-    let lives_elsewhere = !already_in_target
-        && world
-            .resource::<DockTree>()
-            .find_leaf(window_id)
-            .is_some();
+    let lives_elsewhere =
+        !already_in_target && world.resource::<DockTree>().find_leaf(window_id).is_some();
 
     let mut tree = world.resource_mut::<DockTree>();
     if lives_elsewhere {
@@ -2421,11 +2421,8 @@ fn apply_default_splits(world: &mut World) {
 
     let mut tree = world.resource_mut::<DockTree>();
     tree.remove_window("jackdaw.project_files");
-    if let Some(new_leaf) = tree.split(
-        left_root,
-        Edge::Bottom,
-        "jackdaw.project_files".to_string(),
-    ) {
+    if let Some(new_leaf) = tree.split(left_root, Edge::Bottom, "jackdaw.project_files".to_string())
+    {
         if let Some(split_id) = tree.parent_of(new_leaf) {
             tree.set_fraction(split_id, 0.75);
         }
@@ -2472,10 +2469,7 @@ fn register_all_dock_windows(mut registry: ResMut<jackdaw_panels::WindowRegistry
         default_area: "bottom_dock".into(),
         priority: 1,
         build: std::sync::Arc::new(|world, parent| {
-            world.spawn((
-                ChildOf(parent),
-                jackdaw_animation::timeline_panel(),
-            ));
+            world.spawn((ChildOf(parent), jackdaw_animation::timeline_panel()));
         }),
     });
 
@@ -2520,10 +2514,7 @@ fn register_all_dock_windows(mut registry: ResMut<jackdaw_panels::WindowRegistry
                 .get_resource::<jackdaw_feathers::icons::IconFont>()
                 .map(|f| f.0.clone())
                 .unwrap_or_default();
-            world.spawn((
-                ChildOf(parent),
-                crate::layout::hierarchy_content(icon_font),
-            ));
+            world.spawn((ChildOf(parent), crate::layout::hierarchy_content(icon_font)));
         }),
     });
 
@@ -2544,7 +2535,10 @@ fn register_all_dock_windows(mut registry: ResMut<jackdaw_panels::WindowRegistry
                 },
                 children![(
                     Text::new("Import"),
-                    TextFont { font_size: 11.0, ..default() },
+                    TextFont {
+                        font_size: 11.0,
+                        ..default()
+                    },
                     TextColor(Color::srgba(1.0, 1.0, 1.0, 0.3)),
                 )],
             ));
@@ -2628,7 +2622,10 @@ fn register_all_dock_windows(mut registry: ResMut<jackdaw_panels::WindowRegistry
                 },
                 children![(
                     Text::new("Resources"),
-                    TextFont { font_size: 11.0, ..default() },
+                    TextFont {
+                        font_size: 11.0,
+                        ..default()
+                    },
                     TextColor(Color::srgba(1.0, 1.0, 1.0, 0.3)),
                 )],
             ));
@@ -2652,7 +2649,10 @@ fn register_all_dock_windows(mut registry: ResMut<jackdaw_panels::WindowRegistry
                 },
                 children![(
                     Text::new("Systems"),
-                    TextFont { font_size: 11.0, ..default() },
+                    TextFont {
+                        font_size: 11.0,
+                        ..default()
+                    },
                     TextColor(Color::srgba(1.0, 1.0, 1.0, 0.3)),
                 )],
             ));
