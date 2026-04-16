@@ -1,4 +1,4 @@
-//! `File > Plugins...` dialog. Lets the user enable/disable compiled-in
+//! `File > Extensions...` dialog. Lets the user enable/disable compiled-in
 //! extensions at runtime. Changes are applied immediately via
 //! `enable_extension` / `disable_extension` and persisted to
 //! `~/.config/jackdaw/extensions.json`.
@@ -14,41 +14,41 @@ use jackdaw_feathers::{
 
 use crate::extensions_config;
 
-pub struct PluginsDialogPlugin;
+pub struct ExtensionsDialogPlugin;
 
-impl Plugin for PluginsDialogPlugin {
+impl Plugin for ExtensionsDialogPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PluginsDialogOpen>()
-            .add_systems(Update, populate_plugins_dialog)
-            .add_observer(on_plugin_checkbox_commit)
+        app.init_resource::<ExtensionsDialogOpen>()
+            .add_systems(Update, populate_extensions_dialog)
+            .add_observer(on_extension_checkbox_commit)
             .add_observer(on_dialog_closed);
     }
 }
 
 /// Clear the open flag whenever any dialog closes. Safe because populate
-/// also checks for existing plugin checkboxes — it won't run again until
-/// the next open.
-fn on_dialog_closed(_: On<CloseDialogEvent>, mut open: ResMut<PluginsDialogOpen>) {
+/// also checks for existing extension checkboxes — it won't run again
+/// until the next open.
+fn on_dialog_closed(_: On<CloseDialogEvent>, mut open: ResMut<ExtensionsDialogOpen>) {
     open.0 = false;
 }
 
 /// Set to `true` while the dialog is being shown. Used by the populate
 /// system to know whether to fill the dialog's children slot.
 #[derive(Resource, Default)]
-struct PluginsDialogOpen(bool);
+struct ExtensionsDialogOpen(bool);
 
-/// Marks a checkbox as belonging to the plugins dialog. Stores the
+/// Marks a checkbox as belonging to the extensions dialog. Stores the
 /// extension name so the commit observer knows which one to toggle.
 #[derive(Component)]
-struct PluginCheckbox {
+struct ExtensionCheckbox {
     extension_name: String,
 }
 
-/// Opened from `File > Plugins...`. Called from the menu action handler.
-pub fn open_plugins_dialog(world: &mut World) {
-    world.resource_mut::<PluginsDialogOpen>().0 = true;
+/// Opened from `File > Extensions...`. Called from the menu action handler.
+pub fn open_extensions_dialog(world: &mut World) {
+    world.resource_mut::<ExtensionsDialogOpen>().0 = true;
     world.trigger(
-        OpenDialogEvent::new("Plugins", "Close")
+        OpenDialogEvent::new("Extensions", "Close")
             .without_cancel()
             .with_max_width(Val::Px(380.0)),
     );
@@ -60,17 +60,17 @@ pub fn open_plugins_dialog(world: &mut World) {
 ///
 /// Note: we do NOT filter on `&Children` because a freshly-spawned
 /// `DialogChildrenSlot` with no children doesn't have a `Children`
-/// component at all — the query would never match. Instead we rely on the
-/// `PluginCheckbox` existence check to avoid re-populating.
-fn populate_plugins_dialog(
+/// component at all — the query would never match. Instead we rely on
+/// the `ExtensionCheckbox` existence check to avoid re-populating.
+fn populate_extensions_dialog(
     mut commands: Commands,
     catalog: Res<ExtensionCatalog>,
-    open: Res<PluginsDialogOpen>,
+    open: Res<ExtensionsDialogOpen>,
     slots: Query<Entity, With<DialogChildrenSlot>>,
     loaded: Query<&Extension>,
     editor_font: Res<EditorFont>,
     icon_font: Res<IconFont>,
-    existing: Query<(), With<PluginCheckbox>>,
+    existing: Query<(), With<ExtensionCheckbox>>,
 ) {
     if !open.0 {
         return;
@@ -114,7 +114,7 @@ fn populate_plugins_dialog(
         let label = prettify(&name);
         commands.spawn((
             ChildOf(list),
-            PluginCheckbox {
+            ExtensionCheckbox {
                 extension_name: name.clone(),
             },
             checkbox(CheckboxProps::new(label).checked(checked), &font, &ifont),
@@ -122,11 +122,11 @@ fn populate_plugins_dialog(
     }
 }
 
-/// Observer: when a plugin checkbox commits, enable/disable the matching
-/// extension and rewrite the enabled list.
-fn on_plugin_checkbox_commit(
+/// Observer: when an extension checkbox commits, enable/disable the
+/// matching extension and rewrite the enabled list.
+fn on_extension_checkbox_commit(
     event: On<CheckboxCommitEvent>,
-    checkboxes: Query<&PluginCheckbox>,
+    checkboxes: Query<&ExtensionCheckbox>,
     mut commands: Commands,
 ) {
     let Ok(cb) = checkboxes.get(event.entity) else {

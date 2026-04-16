@@ -4483,6 +4483,7 @@ dependencies = [
  "sample_extension",
  "serde",
  "serde_json",
+ "viewable_camera_extension",
 ]
 
 [[package]]
@@ -7547,6 +7548,16 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "viewable_camera_extension"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_enhanced_input",
+ "jackdaw_api",
+ "jackdaw_commands",
+]
 
 [[package]]
 name = "walkdir"

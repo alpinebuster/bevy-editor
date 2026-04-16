@@ -1,3 +1,4 @@
+pub mod add_entity_picker;
 pub mod alignment_guides;
 pub mod asset_browser;
 pub mod asset_catalog;
@@ -17,6 +18,7 @@ pub mod keybinds;
 pub use inspector::{EditorMeta, ReflectEditorMeta};
 pub mod extension_loader;
 pub mod extensions_config;
+pub mod extensions_dialog;
 pub mod layout;
 pub mod material_browser;
 pub mod material_preview;
@@ -24,7 +26,6 @@ pub mod modal_transform;
 pub mod navmesh;
 pub mod physics_brush_bridge;
 pub mod physics_tool;
-pub mod plugins_dialog;
 pub mod prefab_picker;
 pub mod project;
 pub mod project_files;
@@ -151,7 +152,7 @@ impl Plugin for EditorPlugin {
             .add_plugins(jackdaw_animation::AnimationPlugin)
             .add_plugins(jackdaw_panels::DockPlugin)
             .add_plugins(extension_loader::ExtensionLoaderPlugin)
-            .add_plugins(plugins_dialog::PluginsDialogPlugin)
+            .add_plugins(extensions_dialog::ExtensionsDialogPlugin)
             .add_systems(
                 Startup,
                 (
@@ -175,6 +176,8 @@ impl Plugin for EditorPlugin {
             .init_resource::<MenuBarDirty>()
             .add_observer(flag_menu_dirty_on_window_add)
             .add_observer(flag_menu_dirty_on_window_remove)
+            .add_observer(flag_menu_dirty_on_menu_entry_add)
+            .add_observer(flag_menu_dirty_on_menu_entry_remove)
             .add_systems(
                 OnEnter(AppState::Editor),
                 (spawn_layout, init_layout, populate_menu).chain(),
@@ -203,6 +206,8 @@ impl Plugin for EditorPlugin {
                     handle_keyframe_delete_intercept.before(entity_ops::handle_entity_keys),
                     handle_timeline_shortcuts.before(entity_ops::handle_entity_keys),
                     auto_save_layout_on_change,
+                    add_entity_picker::filter_add_entity_picker,
+                    add_entity_picker::close_add_entity_picker_on_escape,
                 )
                     .run_if(in_state(AppState::Editor)),
             )
@@ -225,6 +230,9 @@ impl Plugin for EditorPlugin {
         // `ContextInstances` resource.
         jackdaw_api::register_extension(app, "sample", || {
             Box::new(sample_extension::SampleExtension)
+        });
+        jackdaw_api::register_extension(app, "viewable_camera", || {
+            Box::new(viewable_camera_extension::ViewableCameraExtension)
         });
 
         // Enable extensions. Has to run AFTER all plugins finish() — BEI
@@ -262,6 +270,20 @@ fn flag_menu_dirty_on_window_add(
 
 fn flag_menu_dirty_on_window_remove(
     _: On<Remove, jackdaw_api::RegisteredWindow>,
+    mut dirty: ResMut<MenuBarDirty>,
+) {
+    dirty.0 = true;
+}
+
+fn flag_menu_dirty_on_menu_entry_add(
+    _: On<Add, jackdaw_api::RegisteredMenuEntry>,
+    mut dirty: ResMut<MenuBarDirty>,
+) {
+    dirty.0 = true;
+}
+
+fn flag_menu_dirty_on_menu_entry_remove(
+    _: On<Remove, jackdaw_api::RegisteredMenuEntry>,
     mut dirty: ResMut<MenuBarDirty>,
 ) {
     dirty.0 = true;
@@ -1653,6 +1675,28 @@ fn populate_menu(world: &mut World) {
         }
     }
 
+    // Collect extension-contributed menu entries for menus OTHER than
+    // "Add". The "Add" menu goes through the shared
+    // `collect_add_menu_items` helper below so the toolbar and the
+    // scene-tree picker present identical content.
+    let mut ext_menu_entries: std::collections::BTreeMap<String, Vec<(String, String)>> =
+        std::collections::BTreeMap::new();
+    {
+        let mut q = world.query::<&jackdaw_api::RegisteredMenuEntry>();
+        for entry in q.iter(world) {
+            if entry.menu == "Add" {
+                continue;
+            }
+            ext_menu_entries
+                .entry(entry.menu.clone())
+                .or_default()
+                .push((format!("op:{}", entry.operator_id), entry.label.clone()));
+        }
+        for entries in ext_menu_entries.values_mut() {
+            entries.sort_by(|a, b| a.1.cmp(&b.1));
+        }
+    }
+
     // Collect window entries from WindowRegistry grouped by default_area.
     // Built-in windows have a default_area, extension windows don't (empty string).
     let window_registry = world.resource::<jackdaw_panels::WindowRegistry>();
@@ -1697,6 +1741,26 @@ fn populate_menu(world: &mut World) {
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
+
+    // Build the Add menu from the shared helper so the toolbar and the
+    // scene-tree Add Entity picker stay in lockstep. Separators are
+    // inserted between categories.
+    let add_items = add_entity_picker::collect_add_menu_items(world);
+    let mut add_menu: Vec<(String, String)> = Vec::with_capacity(add_items.len() + 8);
+    let mut last_category: Option<String> = None;
+    for item in add_items {
+        if last_category.as_deref() != Some(item.category.as_str()) {
+            if last_category.is_some() {
+                add_menu.push(("---".into(), String::new()));
+            }
+            last_category = Some(item.category.clone());
+        }
+        add_menu.push((item.action, item.label));
+    }
+    let add_menu_refs: Vec<(&str, &str)> = add_menu
+        .iter()
+        .map(|(k, v)| (k.as_str(), v.as_str()))
+        .collect();
     jackdaw_feathers::menu_bar::populate_menu_bar(
         world,
         menu_bar_entity,
@@ -1713,7 +1777,7 @@ fn populate_menu(world: &mut World) {
                     ("file.save_template", "Save Selection as Template"),
                     ("---", ""),
                     ("file.keybinds", "Keybinds..."),
-                    ("file.plugins", "Plugins..."),
+                    ("file.extensions", "Extensions..."),
                     ("---", ""),
                     ("file.open_recent", "Open Recent..."),
                     ("file.home", "Home"),
@@ -1747,25 +1811,7 @@ fn populate_menu(world: &mut World) {
                     ("view.hierarchy_arrows", "Toggle Hierarchy Arrows"),
                 ],
             ),
-            (
-                "Add",
-                vec![
-                    ("add.cube", "Cube"),
-                    ("add.sphere", "Sphere"),
-                    ("---", ""),
-                    ("add.point_light", "Point Light"),
-                    ("add.directional_light", "Directional Light"),
-                    ("add.spot_light", "Spot Light"),
-                    ("---", ""),
-                    ("add.camera", "Camera"),
-                    ("add.empty", "Empty"),
-                    ("---", ""),
-                    ("add.navmesh", "Navmesh Region"),
-                    ("add.terrain", "Terrain"),
-                    ("---", ""),
-                    ("add.prefab", "Prefab..."),
-                ],
-            ),
+            ("Add", add_menu_refs),
             ("Window", window_entries_refs),
         ],
     );
@@ -1900,9 +1946,9 @@ fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
         "file.keybinds" => {
             commands.trigger(keybind_settings::OpenKeybindSettingsEvent);
         }
-        "file.plugins" => {
+        "file.extensions" => {
             commands.queue(|world: &mut World| {
-                plugins_dialog::open_plugins_dialog(world);
+                extensions_dialog::open_extensions_dialog(world);
             });
         }
         "file.home" => {
@@ -2041,6 +2087,16 @@ fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
         "add.prefab" => {
             commands.queue(|world: &mut World| {
                 crate::prefab_picker::open_prefab_picker(world);
+            });
+        }
+        action if action.starts_with("op:") => {
+            // Extension-contributed menu entry. The action id is the
+            // operator id with an "op:" prefix — dispatch it through the
+            // same path as keybind-triggered operators so behavior
+            // (history entry, poll, modal) is identical.
+            let operator_id = action.strip_prefix("op:").unwrap().to_string();
+            commands.queue(move |world: &mut World| {
+                jackdaw_api::lifecycle::dispatch_operator_by_id(world, &operator_id, true);
             });
         }
         action if action.starts_with("window.") => {

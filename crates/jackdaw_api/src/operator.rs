@@ -41,6 +41,35 @@ pub trait Operator: InputAction + 'static {
     const LABEL: &'static str;
     const DESCRIPTION: &'static str = "";
 
+    /// Which BEI event triggers the operator's invoke system.
+    ///
+    /// - `Trigger::Start` (default): key down. Discrete one-shot semantics,
+    ///   matches Blender and the common case.
+    /// - `Trigger::Fire`: every frame while the input is held. Rarely right
+    ///   on its own — pair with `MODAL = true` for state-tracking sessions,
+    ///   or use for per-frame probes.
+    /// - `Trigger::Complete`: key up. "Press to arm, release to commit"
+    ///   without a full modal state machine.
+    /// - `Trigger::Manual`: don't auto-wire any BEI observer. Extensions
+    ///   invoke the operator themselves via
+    ///   [`crate::lifecycle::dispatch_operator_by_id`] — useful for
+    ///   operators driven by UI buttons, F3 search, or other code paths.
+    const TRIGGER: Trigger = Trigger::Start;
+
+    /// Modal operators stay active across frames.
+    ///
+    /// When `MODAL = true` and the invoke system returns
+    /// [`OperatorResult::Running`], the dispatcher keeps the
+    /// [`OperatorCommandBuffer`] prepared and re-runs the invoke system
+    /// every frame until it returns `Finished` or `Cancelled`. Every
+    /// `record` call across those frames lands in the same `CommandGroup`,
+    /// so the entire modal session commits as one undo entry.
+    ///
+    /// When `MODAL = false` (default), `Running` is treated like `Finished`
+    /// — the operator runs once, the buffer is drained, and a history
+    /// entry is pushed immediately.
+    const MODAL: bool = false;
+
     /// Register the primary execute system. Called once during
     /// `ExtensionContext::register_operator::<Self>()`. The returned
     /// `SystemId` is stored on the operator entity and unregistered on
@@ -59,6 +88,19 @@ pub trait Operator: InputAction + 'static {
     fn register_invoke(commands: &mut Commands) -> SystemId<(), OperatorResult> {
         Self::register_execute(commands)
     }
+}
+
+/// Which BEI event an operator reacts to. See [`Operator::TRIGGER`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Trigger {
+    /// Key/button down (`Start<A>`). One-shot, discrete.
+    Start,
+    /// Every frame while held (`Fire<A>`). Usually paired with `MODAL = true`.
+    Fire,
+    /// Key/button up (`Complete<A>`).
+    Complete,
+    /// No auto-wired observer. Caller dispatches explicitly.
+    Manual,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

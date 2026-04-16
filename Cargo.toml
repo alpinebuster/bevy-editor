@@ -15,7 +15,11 @@ default = []
 hot-reload = ["dep:bevy_simple_subsecond_system"]
 
 [workspace]
-members = ["crates/*", "examples/sample_extension"]
+members = [
+    "crates/*",
+    "examples/sample_extension",
+    "examples/viewable_camera_extension",
+]
 
 [dependencies]
 bevy.workspace = true
@@ -36,6 +40,7 @@ jackdaw_panels.workspace = true
 jackdaw_api.workspace = true
 bevy_enhanced_input.workspace = true
 sample_extension = { path = "examples/sample_extension" }
+viewable_camera_extension = { path = "examples/viewable_camera_extension" }
 serde.workspace = true
 serde_json.workspace = true
 avian3d.workspace = true

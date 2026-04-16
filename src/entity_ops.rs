@@ -143,6 +143,17 @@ pub fn create_entity(
             .spawn((
                 Name::new("Camera"),
                 Camera3d::default(),
+                Camera {
+                    // Scene cameras are authored inactive so they don't
+                    // render over the editor viewport. They become active
+                    // at play time (or via a future "preview through this
+                    // camera" operator).
+                    is_active: false,
+                    ..default()
+                },
+                bevy::camera::RenderTarget::None {
+                    size: UVec2::splat(1),
+                },
                 Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
             ))
             .id(),

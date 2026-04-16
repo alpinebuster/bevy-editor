@@ -1100,6 +1100,7 @@ pub fn hierarchy_content(icon_font: Handle<Font>) -> impl Bundle {
                 ],
             ),
             (
+                crate::add_entity_picker::AddEntityButton,
                 Interaction::default(),
                 Hovered::default(),
                 Node {
@@ -1127,6 +1128,14 @@ pub fn hierarchy_content(icon_font: Handle<Font>) -> impl Bundle {
                         if let Ok(mut bg) = bg.get_mut(out.event_target()) {
                             bg.0 = tokens::ELEVATED_BG;
                         }
+                    },
+                ),
+                observe(
+                    |mut click: On<Pointer<Click>>, mut commands: Commands| {
+                        click.propagate(false);
+                        commands.queue(|world: &mut World| {
+                            crate::add_entity_picker::open_add_entity_picker(world);
+                        });
                     },
                 ),
                 children![

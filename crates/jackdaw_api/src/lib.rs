@@ -65,20 +65,20 @@ use jackdaw_panels::{
 };
 
 pub use lifecycle::{
-    Extension, ExtensionCatalog, ExtensionCtor, OperatorEntity, OperatorIndex,
-    RegisteredPanelExtension, RegisteredWindow, RegisteredWorkspace, disable_extension,
-    enable_extension, register_extension, unload_extension,
+    ActiveModalOperator, Extension, ExtensionCatalog, ExtensionCtor, OperatorEntity, OperatorIndex,
+    RegisteredMenuEntry, RegisteredPanelExtension, RegisteredWindow, RegisteredWorkspace,
+    disable_extension, enable_extension, register_extension, tick_modal_operator, unload_extension,
 };
-pub use operator::{Operator, OperatorCommandBuffer, OperatorResult};
+pub use operator::{Operator, OperatorCommandBuffer, OperatorResult, Trigger};
 pub use registries::PanelExtensionRegistry;
 
 /// Re-exports plugin authors will want in one import.
 pub mod prelude {
     pub use crate::lifecycle::{Extension, ExtensionCatalog, OperatorEntity, OperatorIndex};
-    pub use crate::operator::{Operator, OperatorCommandBuffer, OperatorResult};
+    pub use crate::operator::{Operator, OperatorCommandBuffer, OperatorResult, Trigger};
     pub use crate::{
-        ExtensionContext, ExtensionPoint, JackdawExtension, PanelContext, SectionBuildFn,
-        WindowDescriptor,
+        ExtensionContext, ExtensionPoint, JackdawExtension, MenuEntryDescriptor, PanelContext,
+        SectionBuildFn, WindowDescriptor,
     };
     // BEI types extension authors need for `actions!` / `bindings!` / observers.
     pub use bevy_enhanced_input::prelude::*;
@@ -193,8 +193,9 @@ impl<'a> ExtensionContext<'a> {
     }
 
     /// Register an operator. Spawns an `OperatorEntity` as a child of the
-    /// extension entity; spawns an observer under the operator entity that
-    /// dispatches the operator when its BEI action fires.
+    /// extension entity; spawns a BEI observer that dispatches the operator
+    /// based on the operator's `TRIGGER` const (`Start`, `Fire`, `Complete`,
+    /// or `Manual` which skips observer spawning).
     pub fn register_operator<O: Operator>(&mut self) {
         let ext = self.extension_entity;
 
@@ -220,30 +221,58 @@ impl<'a> ExtensionContext<'a> {
                     execute,
                     invoke,
                     poll,
+                    modal: O::MODAL,
                 },
                 ChildOf(ext),
             ))
             .id();
 
-        // Spawn the `Start<O>` observer as a child of the operator entity.
-        // We use `Start` rather than `Fire` so the operator fires exactly
-        // once per key press, matching Blender's operator semantics. BEI's
-        // `Fire<A>` triggers every frame while the key is held, which is
-        // correct for continuous actions (camera movement, dragging) but
-        // wrong for discrete ops that should be in the undo history once
-        // per invocation. Continuous-fire cases don't go through operators
-        // anyway — extensions spawn plain BEI observers for those.
+        // Wire up the BEI observer based on O::TRIGGER.
         //
-        // When the operator entity despawns, this observer goes with it.
-        let observer = Observer::new(
-            move |_: bevy::prelude::On<bevy_enhanced_input::prelude::Start<O>>,
-                  mut commands: Commands| {
-                commands.queue(move |world: &mut World| {
-                    crate::lifecycle::dispatch_operator_by_id(world, O::ID, true);
-                });
-            },
-        );
-        self.world.spawn((observer, ChildOf(op_entity)));
+        // The observer is spawned as a child of the operator entity, so
+        // despawning the operator automatically drops the observer.
+        // `Trigger::Manual` is a special case: no observer is spawned, and
+        // the caller is expected to invoke the operator via
+        // `dispatch_operator_by_id` (e.g. from a menu or button click).
+        match O::TRIGGER {
+            crate::operator::Trigger::Start => {
+                let observer = Observer::new(
+                    move |_: bevy::prelude::On<bevy_enhanced_input::prelude::Start<O>>,
+                          mut commands: Commands| {
+                        commands.queue(move |world: &mut World| {
+                            crate::lifecycle::dispatch_operator_by_id(world, O::ID, true);
+                        });
+                    },
+                );
+                self.world.spawn((observer, ChildOf(op_entity)));
+            }
+            crate::operator::Trigger::Fire => {
+                let observer = Observer::new(
+                    move |_: bevy::prelude::On<bevy_enhanced_input::prelude::Fire<O>>,
+                          mut commands: Commands| {
+                        commands.queue(move |world: &mut World| {
+                            crate::lifecycle::dispatch_operator_by_id(world, O::ID, true);
+                        });
+                    },
+                );
+                self.world.spawn((observer, ChildOf(op_entity)));
+            }
+            crate::operator::Trigger::Complete => {
+                let observer = Observer::new(
+                    move |_: bevy::prelude::On<bevy_enhanced_input::prelude::Complete<O>>,
+                          mut commands: Commands| {
+                        commands.queue(move |world: &mut World| {
+                            crate::lifecycle::dispatch_operator_by_id(world, O::ID, true);
+                        });
+                    },
+                );
+                self.world.spawn((observer, ChildOf(op_entity)));
+            }
+            crate::operator::Trigger::Manual => {
+                // No observer. Callers invoke the operator directly via
+                // `lifecycle::dispatch_operator_by_id`.
+            }
+        }
     }
 
     /// Inject a section into an existing panel (e.g. add a sub-section to
@@ -263,6 +292,46 @@ impl<'a> ExtensionContext<'a> {
             ChildOf(ext),
         ));
     }
+
+    /// Contribute an entry to one of the editor's top-level menus
+    /// (`"Add"`, `"Tools"`, etc.). Clicking the entry dispatches the
+    /// referenced operator.
+    ///
+    /// The menu bar rebuilds automatically when entries are added or
+    /// removed. When the extension unloads, its menu entries despawn
+    /// with it and the menu rebuilds without them.
+    ///
+    /// ```ignore
+    /// ctx.register_menu_entry(MenuEntryDescriptor {
+    ///     menu: "Add".into(),
+    ///     label: "My Camera".into(),
+    ///     operator_id: PlaceMyCamera::ID,
+    /// });
+    /// ```
+    pub fn register_menu_entry(&mut self, descriptor: MenuEntryDescriptor) {
+        let ext = self.extension_entity;
+        self.world.spawn((
+            RegisteredMenuEntry {
+                menu: descriptor.menu,
+                label: descriptor.label,
+                operator_id: descriptor.operator_id,
+            },
+            ChildOf(ext),
+        ));
+    }
+}
+
+/// Extension-facing descriptor for a menu bar entry. See
+/// [`ExtensionContext::register_menu_entry`].
+pub struct MenuEntryDescriptor {
+    /// Top-level menu name (`"Add"`, `"Tools"`, etc.).
+    pub menu: String,
+    /// Text shown on the menu item.
+    pub label: String,
+    /// ID of an operator registered on the same extension (or any loaded
+    /// extension — ids are global). Clicking the menu entry dispatches
+    /// this operator.
+    pub operator_id: &'static str,
 }
 
 /// Window registration info — the extension-facing version of

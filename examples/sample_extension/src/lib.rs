@@ -4,8 +4,9 @@
 //! - A "Hello Extension" dock window (plain UI, no input).
 //! - A `HelloOp` operator bound to `F9` via a BEI context owned by this plugin.
 //!
-//! Toggling this plugin off via `File > Plugins...` should make both the
-//! window entry disappear from the add-window popup and the keybind go dead.
+//! Toggling this extension off via `File > Extensions...` should make both
+//! the window entry disappear from the add-window popup and the keybind go
+//! dead.
 
 use std::sync::Arc;
 

@@ -41,6 +41,34 @@ pub struct OperatorEntity {
     pub execute: SystemId<(), OperatorResult>,
     pub invoke: SystemId<(), OperatorResult>,
     pub poll: Option<SystemId<(), bool>>,
+    /// Mirrors [`crate::Operator::MODAL`]. Set at registration so the
+    /// dispatcher can enter modal mode without re-resolving the generic
+    /// operator type.
+    pub modal: bool,
+}
+
+/// Tracks the currently-active modal operator. Exactly zero or one at a
+/// time — starting a second modal while one is active is refused.
+///
+/// While set, `tick_modal_operator` re-runs the invoke system every frame
+/// and the [`crate::OperatorCommandBuffer`] stays prepared across frames
+/// so every `record` call lands in the same `CommandGroup`.
+#[derive(Resource, Default)]
+pub struct ActiveModalOperator {
+    pub(crate) id: Option<&'static str>,
+    pub(crate) operator_entity: Option<Entity>,
+    pub(crate) invoke_system: Option<SystemId<(), OperatorResult>>,
+    pub(crate) label: Option<String>,
+}
+
+impl ActiveModalOperator {
+    pub fn is_active(&self) -> bool {
+        self.id.is_some()
+    }
+
+    pub fn id(&self) -> Option<&'static str> {
+        self.id
+    }
 }
 
 /// Marks an entity as tracking a dock window registration.
@@ -66,6 +94,23 @@ pub struct RegisteredWorkspace {
 pub struct RegisteredPanelExtension {
     pub panel_id: String,
     pub section_index: usize,
+}
+
+/// An extension-contributed entry in the editor menu bar.
+///
+/// Spawned as a child of the [`Extension`] entity via
+/// [`crate::ExtensionContext::register_menu_entry`]. The editor's
+/// `populate_menu` system queries these and inserts them into the right
+/// menu. Clicking one dispatches the referenced operator.
+///
+/// `menu` is the top-level menu name (`"Add"`, `"Tools"`, etc.). For now
+/// we're flat — no sub-menus — but the field is a path so that's easy to
+/// extend later (e.g. `"Add/Cameras"`).
+#[derive(Component, Clone, Debug)]
+pub struct RegisteredMenuEntry {
+    pub menu: String,
+    pub label: String,
+    pub operator_id: &'static str,
 }
 
 /// Reactive index from operator id → operator entity. Maintained by the
@@ -153,10 +198,29 @@ where
 use crate::operator::OperatorCommandBuffer;
 use jackdaw_commands::{CommandGroup, CommandHistory};
 
-/// Dispatch an operator by id. Used by the BEI `Fire<O>` observers spawned
-/// in `ExtensionContext::register_operator`.
-pub fn dispatch_operator_by_id(world: &mut World, id: &'static str, creates_history_entry: bool) {
-    // Resolve operator via the reactive index.
+/// Dispatch an operator by id. Used by the BEI trigger observers spawned
+/// in `ExtensionContext::register_operator`, and callable directly for
+/// `Trigger::Manual` operators (UI buttons, F3 search, etc.).
+///
+/// - Non-modal operators: runs once and pushes a history entry immediately.
+/// - Modal operators: if the invoke returns `Running`, enters modal mode.
+///   The tick system takes over from the next frame.
+///
+/// If another modal operator is already active, the dispatch is refused
+/// with a warn log (matches Blender's "one modal at a time" rule).
+pub fn dispatch_operator_by_id(world: &mut World, id: &str, creates_history_entry: bool) {
+    // Refuse if another modal operator is active.
+    if let Some(active_id) = world.resource::<ActiveModalOperator>().id {
+        warn!(
+            "Ignoring operator '{}' — modal operator '{}' is currently active",
+            id, active_id
+        );
+        return;
+    }
+
+    // Resolve operator via the reactive index. The index keys are
+    // `&'static str` from each operator's trait, but `HashMap` lookup
+    // hashes by string content, so a plain `&str` works.
     let Some(op_entity) = world.resource::<OperatorIndex>().by_id.get(id).copied() else {
         warn!("Tried to dispatch unknown operator: {}", id);
         return;
@@ -172,7 +236,7 @@ pub fn dispatch_operator_by_id(world: &mut World, id: &'static str, creates_hist
         }
     }
 
-    // Prep the command buffer, run the invoke system, drain the buffer.
+    // Prep the command buffer, run the invoke system.
     world
         .resource_mut::<OperatorCommandBuffer>()
         .prepare(creates_history_entry);
@@ -181,27 +245,84 @@ pub fn dispatch_operator_by_id(world: &mut World, id: &'static str, creates_hist
         Ok(r) => r,
         Err(err) => {
             error!("Failed to run operator {}: {:?}", op.id, err);
+            world.resource_mut::<OperatorCommandBuffer>().take();
             return;
         }
     };
 
-    // First pass: treat `Running` like `Finished`. Modal support is future.
-    let finished = matches!(result, OperatorResult::Finished | OperatorResult::Running);
-    if !finished {
-        // Cancelled — drop the recorded commands.
-        world.resource_mut::<OperatorCommandBuffer>().take();
+    match result {
+        OperatorResult::Running if op.modal => {
+            // Enter modal mode. The tick system picks up from next frame;
+            // the command buffer stays prepared across frames.
+            let mut active = world.resource_mut::<ActiveModalOperator>();
+            active.id = Some(op.id);
+            active.operator_entity = Some(op_entity);
+            active.invoke_system = Some(op.invoke);
+            active.label = Some(op.label.to_string());
+        }
+        OperatorResult::Running | OperatorResult::Finished => {
+            // Non-modal `Running` collapses to `Finished` — one-shot behavior.
+            finalize_operator_session(world, &op.label, true);
+        }
+        OperatorResult::Cancelled => {
+            finalize_operator_session(world, &op.label, false);
+        }
+    }
+}
+
+/// Drain the command buffer and, if committing and history-tracked, push a
+/// `CommandGroup` to `CommandHistory`.
+fn finalize_operator_session(world: &mut World, label: &str, commit: bool) {
+    let (recorded, creates_history) = world.resource_mut::<OperatorCommandBuffer>().take();
+    if !commit {
         return;
     }
-
-    let (recorded, creates_history) = world.resource_mut::<OperatorCommandBuffer>().take();
-
     if creates_history && !recorded.is_empty() {
         let group = Box::new(CommandGroup {
             commands: recorded,
-            label: op.label.to_string(),
+            label: label.to_string(),
         });
         world.resource_mut::<CommandHistory>().push_executed(group);
     }
+}
+
+/// Tick system added to Update by `ExtensionLoaderPlugin`. If a modal
+/// operator is active, re-runs its invoke system once per frame and
+/// transitions out of modal on `Finished` or `Cancelled`.
+pub fn tick_modal_operator(world: &mut World) {
+    let Some(invoke) = world.resource::<ActiveModalOperator>().invoke_system else {
+        return;
+    };
+    let result = match world.run_system(invoke) {
+        Ok(r) => r,
+        Err(err) => {
+            error!(
+                "Modal operator's invoke system failed: {:?}; cancelling",
+                err
+            );
+            finalize_modal(world, false);
+            return;
+        }
+    };
+    match result {
+        OperatorResult::Running => { /* stay modal */ }
+        OperatorResult::Finished => finalize_modal(world, true),
+        OperatorResult::Cancelled => finalize_modal(world, false),
+    }
+}
+
+/// Exit modal mode. Drains the command buffer; commits as a history entry
+/// if `commit` is true and the buffer is non-empty, otherwise discards.
+fn finalize_modal(world: &mut World, commit: bool) {
+    let label = {
+        let mut active = world.resource_mut::<ActiveModalOperator>();
+        let label = active.label.take().unwrap_or_default();
+        active.id = None;
+        active.operator_entity = None;
+        active.invoke_system = None;
+        label
+    };
+    finalize_operator_session(world, &label, commit);
 }
 
 // ============================================================================
@@ -347,5 +468,20 @@ pub fn cleanup_panel_extension_on_remove(
 ) {
     if let Ok(r) = registrations.get(trigger.event_target()) {
         registry.remove(&r.panel_id, r.section_index);
+    }
+}
+
+/// Logs the menu entry on add. Actual menu rebuilds are driven by a
+/// separate flag resource in the main crate (`MenuBarDirty`) because this
+/// crate doesn't know about the concrete menu-bar implementation.
+pub fn log_menu_entry_on_add(
+    trigger: On<Add, RegisteredMenuEntry>,
+    entries: Query<&RegisteredMenuEntry>,
+) {
+    if let Ok(entry) = entries.get(trigger.event_target()) {
+        info!(
+            "Registered menu entry: {} > {} -> {}",
+            entry.menu, entry.label, entry.operator_id
+        );
     }
 }
