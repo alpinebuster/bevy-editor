@@ -68,6 +68,7 @@ use jackdaw_panels::{
     DockWindowDescriptor, WindowRegistry, WorkspaceDescriptor, WorkspaceRegistry,
 };
 
+pub use jackdaw_api_macros::operator;
 pub use lifecycle::{
     ActiveModalOperator, CallOperatorError, CallOperatorSettings, Extension, ExtensionCatalog,
     ExtensionCtor, ExtensionKind, OperatorEntity, OperatorIndex, OperatorSession, OperatorWorldExt,
@@ -87,7 +88,7 @@ pub mod prelude {
     pub use crate::operator::{Operator, OperatorResult};
     pub use crate::{
         ExtensionContext, ExtensionPoint, JackdawExtension, MenuEntryDescriptor, PanelContext,
-        SectionBuildFn, WindowDescriptor,
+        SectionBuildFn, WindowDescriptor, operator,
     };
     // BEI types extension authors need for `actions!` / `bindings!` / observers.
     pub use bevy_enhanced_input::prelude::*;

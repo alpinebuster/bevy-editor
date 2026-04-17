@@ -9,7 +9,6 @@
 //!   and no history entry is pushed.
 
 use bevy::camera::RenderTarget;
-use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 use bevy_enhanced_input::prelude::*;
 use jackdaw_api::prelude::*;
@@ -84,21 +83,13 @@ struct CameraPreviewState {
 }
 
 /// Place a viewable camera at the editor camera's current position.
-/// Undoable.
-#[derive(Default, InputAction)]
-#[action_output(bool)]
-pub struct PlaceViewableCamera;
-
-impl Operator for PlaceViewableCamera {
-    const ID: &'static str = "viewable_camera.place";
-    const LABEL: &'static str = "Place Viewable Camera";
-    const DESCRIPTION: &'static str = "Place a camera at the viewport position";
-
-    fn register_execute(commands: &mut Commands) -> SystemId<(), OperatorResult> {
-        commands.register_system(place_viewable_camera)
-    }
-}
-
+/// Undoable via the dispatcher's automatic snapshot-diff.
+#[operator(
+    id = "viewable_camera.place",
+    label = "Place Viewable Camera",
+    description = "Place a camera at the viewport position",
+    name = "PlaceViewableCamera"
+)]
 fn place_viewable_camera(world: &mut World) -> OperatorResult {
     // Match the editor camera's transform so "look through" feels
     // natural on the first toggle.
@@ -132,21 +123,15 @@ fn place_viewable_camera(world: &mut World) -> OperatorResult {
 }
 
 /// Toggle "look through the viewable camera" against the editor view.
-/// Preview is view state, not a scene edit, so it isn't undoable.
-#[derive(Default, InputAction)]
-#[action_output(bool)]
-pub struct ToggleCameraPreview;
-
-impl Operator for ToggleCameraPreview {
-    const ID: &'static str = "viewable_camera.toggle_preview";
-    const LABEL: &'static str = "Toggle Camera Preview";
-    const DESCRIPTION: &'static str = "Look through the selected viewable camera";
-
-    fn register_execute(commands: &mut Commands) -> SystemId<(), OperatorResult> {
-        commands.register_system(toggle_preview)
-    }
-}
-
+/// Preview only mutates Bevy resources and components that aren't in
+/// the scene AST, so the dispatcher's snapshot-diff is empty and no
+/// history entry is pushed.
+#[operator(
+    id = "viewable_camera.toggle_preview",
+    label = "Toggle Camera Preview",
+    description = "Look through the selected viewable camera",
+    name = "ToggleCameraPreview"
+)]
 fn toggle_preview(world: &mut World) -> OperatorResult {
     let currently_active = world.resource::<CameraPreviewState>().active;
     if currently_active.is_some() {
