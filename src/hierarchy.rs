@@ -1015,7 +1015,7 @@ fn on_context_menu_action(
             let operator_id = action.strip_prefix("op:").unwrap().to_string();
             commands.queue(move |world: &mut World| {
                 use jackdaw_api::OperatorWorldExt;
-                let _ = world.call_operator(operator_id);
+                let _ = world.call_operator(operator_id, default());
             });
         }
         _ => {}

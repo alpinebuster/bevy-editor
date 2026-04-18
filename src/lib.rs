@@ -2105,7 +2105,7 @@ fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
             let operator_id = action.strip_prefix("op:").unwrap().to_string();
             commands.queue(move |world: &mut World| {
                 use jackdaw_api::OperatorWorldExt;
-                let _ = world.call_operator(operator_id);
+                let _ = world.call_operator(operator_id, default());
             });
         }
         action if action.starts_with("window.") => {

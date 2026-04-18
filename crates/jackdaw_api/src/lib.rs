@@ -21,7 +21,7 @@
 //! impl Operator for PlaceCube {
 //!     const ID: &'static str = "sample.place_cube";
 //!     const LABEL: &'static str = "Place Cube";
-//!     fn register_execute(commands: &mut Commands) -> SystemId<(), OperatorResult> {
+//!     fn register_execute(commands: &mut Commands) -> SystemId<In<CustomProperties>, OperatorResult> {
 //!         commands.register_system(place_cube)
 //!     }
 //! }
@@ -69,6 +69,7 @@ use jackdaw_panels::{
 };
 
 pub use jackdaw_api_macros::operator;
+pub use jackdaw_jsn::types::CustomProperties;
 pub use lifecycle::{
     ActiveModalOperator, CallOperatorError, CallOperatorSettings, Extension, ExtensionCatalog,
     ExtensionCtor, ExtensionKind, OperatorEntity, OperatorIndex, OperatorSession, OperatorWorldExt,
@@ -79,6 +80,10 @@ pub use operator::{Operator, OperatorResult};
 pub use registries::PanelExtensionRegistry;
 pub use snapshot::{ActiveSnapshotter, SceneSnapshot, SceneSnapshotter};
 
+pub mod jsn {
+    pub use jackdaw_jsn::*;
+}
+
 /// Re-exports plugin authors will want in one import.
 pub mod prelude {
     pub use crate::lifecycle::{
@@ -88,7 +93,9 @@ pub mod prelude {
     pub use crate::operator::{Operator, OperatorResult};
     pub use crate::{
         ExtensionContext, ExtensionPoint, JackdawExtension, MenuEntryDescriptor, PanelContext,
-        SectionBuildFn, WindowDescriptor, operator,
+        SectionBuildFn, WindowDescriptor,
+        jsn::{CustomProperties, PropertyValue},
+        operator,
     };
     // BEI types extension authors need for `actions!` / `bindings!` / observers.
     pub use bevy_enhanced_input::prelude::*;
@@ -199,7 +206,7 @@ impl<'a> ExtensionContext<'a> {
     /// Register a dock window. Spawns a [`RegisteredWindow`] marker
     /// entity as a child of the extension entity; a cleanup observer
     /// calls `WindowRegistry::unregister` when the marker despawns.
-    pub fn register_window(&mut self, descriptor: WindowDescriptor) {
+    pub fn register_window(&mut self, descriptor: WindowDescriptor) -> &mut Self {
         let ext = self.extension_entity;
         let dock_descriptor = DockWindowDescriptor {
             id: descriptor.id.clone(),
@@ -214,16 +221,18 @@ impl<'a> ExtensionContext<'a> {
             .register(dock_descriptor);
         self.world
             .spawn((RegisteredWindow { id: descriptor.id }, ChildOf(ext)));
+        self
     }
 
     /// Register a workspace.
-    pub fn register_workspace(&mut self, descriptor: WorkspaceDescriptor) {
+    pub fn register_workspace(&mut self, descriptor: WorkspaceDescriptor) -> &mut Self {
         let ext = self.extension_entity;
         let id = descriptor.id.clone();
         self.world
             .resource_mut::<WorkspaceRegistry>()
             .register(descriptor);
         self.world.spawn((RegisteredWorkspace { id }, ChildOf(ext)));
+        self
     }
 
     /// Spawn an entity as a child of the extension entity. Typically
@@ -245,7 +254,7 @@ impl<'a> ExtensionContext<'a> {
     /// `true`, a `Fire<O>` observer that dispatches the operator
     /// through [`crate::OperatorWorldExt::call_operator`]. BEI binding
     /// modifiers on the actions shape timing (press / release / hold).
-    pub fn register_operator<O: Operator>(&mut self) {
+    pub fn register_operator<O: Operator>(&mut self) -> &mut Self {
         let ext = self.extension_entity;
 
         let (execute, invoke, availability_check) = {
@@ -280,18 +289,19 @@ impl<'a> ExtensionContext<'a> {
                       mut commands: Commands| {
                     commands.queue(move |world: &mut World| {
                         use crate::OperatorWorldExt;
-                        let _ = world.call_operator(O::ID);
+                        let _ = world.call_operator(O::ID, default());
                     });
                 },
             );
             self.world.spawn((observer, ChildOf(op_entity)));
         }
+        self
     }
 
     /// Inject a section into an existing panel (e.g. add a sub-section to
     /// the Inspector window). Section runs with `In<PanelContext>` each time
     /// the panel re-renders.
-    pub fn extend_window<W: ExtensionPoint>(&mut self, section: SectionBuildFn) {
+    pub fn extend_window<W: ExtensionPoint>(&mut self, section: SectionBuildFn) -> &mut Self {
         let ext = self.extension_entity;
         let panel_id = W::ID.to_string();
         let mut registry = self.world.resource_mut::<PanelExtensionRegistry>();
@@ -304,6 +314,7 @@ impl<'a> ExtensionContext<'a> {
             },
             ChildOf(ext),
         ));
+        self
     }
 
     /// Contribute an entry to one of the editor's top-level menus

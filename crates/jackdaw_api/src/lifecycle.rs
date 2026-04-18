@@ -16,6 +16,7 @@ use std::sync::Arc;
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 use jackdaw_commands::{CommandHistory, EditorCommand};
+use jackdaw_jsn::CustomProperties;
 
 use crate::operator::OperatorResult;
 use crate::snapshot::{ActiveSnapshotter, SceneSnapshot};
@@ -42,8 +43,8 @@ pub struct OperatorEntity {
     pub id: &'static str,
     pub label: &'static str,
     pub description: &'static str,
-    pub execute: SystemId<(), OperatorResult>,
-    pub invoke: SystemId<(), OperatorResult>,
+    pub execute: SystemId<In<CustomProperties>, OperatorResult>,
+    pub invoke: SystemId<In<CustomProperties>, OperatorResult>,
     /// Optional system that returns whether the operator can run in
     /// the current editor state. Equivalent to Blender's `poll`.
     pub availability_check: Option<SystemId<(), bool>>,
@@ -64,7 +65,7 @@ pub struct OperatorEntity {
 pub struct ActiveModalOperator {
     pub(crate) id: Option<&'static str>,
     pub(crate) operator_entity: Option<Entity>,
-    pub(crate) invoke_system: Option<SystemId<(), OperatorResult>>,
+    pub(crate) invoke_system: Option<SystemId<In<CustomProperties>, OperatorResult>>,
     pub(crate) label: Option<String>,
     pub(crate) before_snapshot: Option<Box<dyn SceneSnapshot>>,
 }
@@ -292,13 +293,15 @@ pub trait OperatorWorldExt {
     fn call_operator(
         &mut self,
         id: impl Into<Cow<'static, str>>,
+        params: CustomProperties,
     ) -> Result<OperatorResult, CallOperatorError>;
 
     /// Call an operator with explicit settings.
     fn call_operator_with(
         &mut self,
         id: impl Into<Cow<'static, str>>,
-        settings: &CallOperatorSettings,
+        params: CustomProperties,
+        settings: CallOperatorSettings,
     ) -> Result<OperatorResult, CallOperatorError>;
 
     /// Whether the operator would run in the current editor state.
@@ -311,27 +314,39 @@ pub trait OperatorWorldExt {
 }
 
 /// Knobs passed to [`OperatorWorldExt::call_operator_with`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub struct CallOperatorSettings {
     /// Whether a successful call should push an undo entry. Default
     /// `true`. Set `false` for view-local effects (camera moves,
     /// preview toggles) that should not be undoable.
     pub creates_history_entry: bool,
+    /// The entity to pass to the operator. Default is `None`.
+    pub entity: Option<Entity>,
+    pub execution_context: ExecutionContext,
 }
 
 impl Default for CallOperatorSettings {
     fn default() -> Self {
         Self {
             creates_history_entry: true,
+            entity: None,
+            execution_context: default(),
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub enum ExecutionContext {
+    #[default]
+    Execute,
+    Invoke,
 }
 
 #[derive(Clone, Debug)]
 pub enum CallOperatorError {
     UnknownId(Cow<'static, str>),
     ModalAlreadyActive(&'static str),
-    AvailabilityCheckFailed,
+    NotAvailable,
     ExecuteFailed,
 }
 
@@ -342,7 +357,7 @@ impl std::fmt::Display for CallOperatorError {
             Self::ModalAlreadyActive(id) => {
                 write!(f, "modal operator '{id}' is currently active")
             }
-            Self::AvailabilityCheckFailed => f.write_str("operator's availability check failed"),
+            Self::NotAvailable => f.write_str("operator's availability check failed"),
             Self::ExecuteFailed => f.write_str("operator's execute system failed"),
         }
     }
@@ -354,17 +369,19 @@ impl OperatorWorldExt for World {
     fn call_operator(
         &mut self,
         id: impl Into<Cow<'static, str>>,
+        params: CustomProperties,
     ) -> Result<OperatorResult, CallOperatorError> {
-        self.call_operator_with(id, &CallOperatorSettings::default())
+        self.call_operator_with(id, params, CallOperatorSettings::default())
     }
 
     fn call_operator_with(
         &mut self,
         id: impl Into<Cow<'static, str>>,
-        settings: &CallOperatorSettings,
+        params: CustomProperties,
+        settings: CallOperatorSettings,
     ) -> Result<OperatorResult, CallOperatorError> {
         let id = id.into();
-        dispatch_operator(self, id, settings.creates_history_entry)
+        dispatch_operator(self, id, params, settings)
     }
 
     fn is_operator_available(
@@ -387,14 +404,15 @@ impl OperatorWorldExt for World {
             return Ok(true);
         };
         self.run_system(check)
-            .map_err(|_| CallOperatorError::AvailabilityCheckFailed)
+            .map_err(|_| CallOperatorError::NotAvailable)
     }
 }
 
 fn dispatch_operator(
     world: &mut World,
     id: Cow<'static, str>,
-    creates_history_entry: bool,
+    params: CustomProperties,
+    settings: CallOperatorSettings,
 ) -> Result<OperatorResult, CallOperatorError> {
     if let Some(active_id) = world.resource::<ActiveModalOperator>().id {
         return Err(CallOperatorError::ModalAlreadyActive(active_id));
@@ -415,9 +433,9 @@ fn dispatch_operator(
     if let Some(check) = op.availability_check {
         let available = world
             .run_system(check)
-            .map_err(|_| CallOperatorError::AvailabilityCheckFailed)?;
+            .map_err(|_| CallOperatorError::NotAvailable)?;
         if !available {
-            return Ok(OperatorResult::Cancelled);
+            return Err(CallOperatorError::NotAvailable);
         }
     }
 
@@ -425,11 +443,15 @@ fn dispatch_operator(
     // snapshot. Inner `call_operator` calls mutate inside the outer's
     // span and their changes roll into the outer's diff.
     let is_outermost = world.resource::<OperatorSession>().depth == 0;
-    let before = (is_outermost && creates_history_entry)
+    let before = (is_outermost && settings.creates_history_entry)
         .then(|| world.resource::<ActiveSnapshotter>().0.capture(world));
 
     world.resource_mut::<OperatorSession>().depth += 1;
-    let result = world.run_system(op.invoke);
+    let system = match settings.execution_context {
+        ExecutionContext::Execute => op.execute,
+        ExecutionContext::Invoke => op.invoke,
+    };
+    let result = world.run_system_with(system, params);
     world.resource_mut::<OperatorSession>().depth -= 1;
 
     let result = result.map_err(|_| CallOperatorError::ExecuteFailed)?;
@@ -498,7 +520,7 @@ pub fn tick_modal_operator(world: &mut World) {
     let Some(invoke) = world.resource::<ActiveModalOperator>().invoke_system else {
         return;
     };
-    let result = match world.run_system(invoke) {
+    let result = match world.run_system_with(invoke, default()) {
         Ok(r) => r,
         Err(err) => {
             error!("Modal operator's invoke system failed: {err:?}; cancelling");

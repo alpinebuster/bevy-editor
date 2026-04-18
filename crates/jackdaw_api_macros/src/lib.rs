@@ -166,7 +166,7 @@ pub fn operator(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             fn register_execute(
                 commands: &mut ::bevy::ecs::system::Commands,
-            ) -> ::bevy::ecs::system::SystemId<(), ::jackdaw_api::OperatorResult> {
+            ) -> ::bevy::ecs::system::SystemId<::bevy::ecs::system::In<::jackdaw_api::jsn::CustomProperties>, ::jackdaw_api::OperatorResult> {
                 commands.register_system(#fn_name)
             }
 

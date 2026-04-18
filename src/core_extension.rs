@@ -10,8 +10,11 @@ pub(super) fn plugin(app: &mut App) {
 pub struct JackdawCoreExtension;
 
 impl JackdawExtension for JackdawCoreExtension {
-    fn name(&self) -> &str {
-        "Jackdaw Core Extension"
+    fn name() -> String {
+        "Jackdaw Core Extension".to_string()
+    }
+    fn kind() -> ExtensionKind {
+        ExtensionKind::Builtin
     }
 
     fn register_input_contexts(&self, app: &mut App) {
@@ -54,7 +57,7 @@ pub struct SampleContext;
     description = "Logs a hello message",
     name = "HelloOp"
 )]
-fn hello_op() -> OperatorResult {
+fn hello_op(_: In<CustomProperties>) -> OperatorResult {
     info!("Hello from the sample extension operator!");
     OperatorResult::Finished
 }
@@ -73,7 +76,7 @@ fn time_is_running(time: Res<Time>) -> bool {
     is_available = time_is_running,
     name = "HelloTimeOp"
 )]
-fn hello_time_op(time: Res<Time>) -> OperatorResult {
+fn hello_time_op(_: In<CustomProperties>, time: Res<Time>) -> OperatorResult {
     info!(
         "Hello at frame delta {:.3}s from the sample extension",
         time.delta_secs()

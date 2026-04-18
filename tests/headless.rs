@@ -47,7 +47,10 @@ fn can_run_extension() {
     // todo: maybe do plugin setup in `Startup` so that jackdaw is actually ready in the first frame?
     app.update();
     for _ in 0..10 {
-        let result = app.world_mut().call_operator(SampleExtension::OP).unwrap();
+        let result = app
+            .world_mut()
+            .call_operator(SampleExtension::SPAWN, default())
+            .unwrap();
         assert_eq!(result, OperatorResult::Finished);
         app.update();
     }
@@ -69,17 +72,38 @@ fn can_call_operator() {
     assert_eq!(amount_of_panels, 0);
     assert!(!app.world_mut().contains_resource::<Marker>());
 
-    let result = app.world_mut().call_operator(SampleExtension::OP).unwrap();
+    let result = app
+        .world_mut()
+        .call_operator(SampleExtension::SPAWN, default())
+        .unwrap();
     assert_eq!(result, OperatorResult::Finished);
 
     assert!(app.world_mut().contains_resource::<Marker>());
+}
+
+#[test]
+fn can_pass_params_to_operator() {
+    let mut app = headless_app();
+    app.register_extension::<SampleExtension>();
+    app.finish();
+    app.update();
+
+    let mut params = CustomProperties::default();
+    params.insert("foo".to_string(), PropertyValue::String("bar".to_string()));
+
+    let result = app
+        .world_mut()
+        .call_operator(SampleExtension::CHECK_PARAMS, params)
+        .unwrap();
+    assert_eq!(result, OperatorResult::Finished);
 }
 
 #[derive(Default)]
 pub struct SampleExtension;
 
 impl SampleExtension {
-    const OP: &'static str = "sample.spawn";
+    const SPAWN: &'static str = "sample.spawn";
+    const CHECK_PARAMS: &'static str = "sample.check_params";
 }
 
 impl JackdawExtension for SampleExtension {
@@ -89,12 +113,13 @@ impl JackdawExtension for SampleExtension {
 
     fn register(&self, ctx: &mut ExtensionContext) {
         ctx.register_window(WindowDescriptor {
-            id: Self::OP.into(),
+            id: Self::SPAWN.into(),
             build: Arc::new(build_panel),
             default_area: Some("left".into()),
             ..default()
         });
-        ctx.register_operator::<SpawnMarkerOp>();
+        ctx.register_operator::<SpawnMarkerOp>()
+            .register_operator::<CheckParamsOp>();
     }
 }
 
@@ -106,10 +131,18 @@ fn build_panel(world: &mut World, parent: Entity) {
 pub struct SampleContext;
 
 #[operator(
-    id = SampleExtension::OP,
+    id = SampleExtension::SPAWN,
 )]
-fn spawn_marker(mut commands: Commands) -> OperatorResult {
+fn spawn_marker(_: In<CustomProperties>, mut commands: Commands) -> OperatorResult {
     commands.init_resource::<Marker>();
+    OperatorResult::Finished
+}
+
+#[operator(
+    id = SampleExtension::CHECK_PARAMS,
+)]
+fn check_params(params: In<CustomProperties>) -> OperatorResult {
+    assert_eq!(params["foo"], PropertyValue::String("bar".to_string()));
     OperatorResult::Finished
 }
 

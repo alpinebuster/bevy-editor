@@ -4506,6 +4506,7 @@ dependencies = [
  "bevy_enhanced_input",
  "jackdaw_api_macros",
  "jackdaw_commands",
+ "jackdaw_jsn",
  "jackdaw_panels",
 ]
 

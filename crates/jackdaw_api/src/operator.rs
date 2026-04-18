@@ -1,6 +1,7 @@
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 use bevy_enhanced_input::prelude::InputAction;
+use jackdaw_jsn::CustomProperties;
 
 /// A Blender-style operator.
 ///
@@ -71,7 +72,7 @@ pub trait Operator: InputAction + 'static {
     /// `ExtensionContext::register_operator::<Self>()`. The returned
     /// `SystemId` is stored on the operator entity and unregistered
     /// on despawn.
-    fn register_execute(commands: &mut Commands) -> SystemId<(), OperatorResult>;
+    fn register_execute(commands: &mut Commands) -> SystemId<In<CustomProperties>, OperatorResult>;
 
     /// Register an optional availability check. Returns `true` if the
     /// operator can run in the current editor state, `false` if it
@@ -84,7 +85,7 @@ pub trait Operator: InputAction + 'static {
     /// keybinds, and F3 search run; it can differ from `execute`
     /// when the caller wants to open a dialog or start a drag before
     /// the primary work happens. Defaults to `execute`.
-    fn register_invoke(commands: &mut Commands) -> SystemId<(), OperatorResult> {
+    fn register_invoke(commands: &mut Commands) -> SystemId<In<CustomProperties>, OperatorResult> {
         Self::register_execute(commands)
     }
 }

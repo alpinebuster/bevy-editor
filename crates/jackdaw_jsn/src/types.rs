@@ -201,7 +201,7 @@ impl Brush {
     }
 }
 
-#[derive(Component, Reflect, Default, Clone, Debug)]
+#[derive(Component, Reflect, Default, Clone, Debug, Deref, DerefMut)]
 #[reflect(Component, Default)]
 pub struct CustomProperties {
     pub properties: BTreeMap<String, PropertyValue>,
