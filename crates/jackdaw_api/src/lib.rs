@@ -82,8 +82,8 @@ pub use snapshot::{ActiveSnapshotter, SceneSnapshot, SceneSnapshotter};
 /// Re-exports plugin authors will want in one import.
 pub mod prelude {
     pub use crate::lifecycle::{
-        CallOperatorError, CallOperatorSettings, Extension, ExtensionCatalog, ExtensionKind,
-        OperatorEntity, OperatorIndex, OperatorWorldExt,
+        CallOperatorError, CallOperatorSettings, Extension, ExtensionAppExt, ExtensionCatalog,
+        ExtensionKind, OperatorEntity, OperatorIndex, OperatorWorldExt,
     };
     pub use crate::operator::{Operator, OperatorResult};
     pub use crate::{

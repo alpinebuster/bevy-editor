@@ -262,6 +262,34 @@ where
         .register(name, kind, ctor);
 }
 
+pub trait ExtensionAppExt {
+    fn register_extension<T: crate::JackdawExtension + Default>(&mut self) -> &mut Self;
+    fn register_extension_with<T: crate::JackdawExtension + Default>(
+        &mut self,
+        ctor: impl Fn() -> Box<dyn crate::JackdawExtension> + Send + Sync + 'static,
+    ) -> &mut Self;
+}
+
+impl ExtensionAppExt for App {
+    fn register_extension<T: crate::JackdawExtension + Default>(&mut self) -> &mut Self {
+        let ext = T::default();
+        let name = ext.name();
+        // TODO: remove `name` duplication
+        // can we do `fn name() -> String` without `&self` plz?
+        register_extension(self, name, || Box::new(T::default()));
+        self
+    }
+    fn register_extension_with<T: crate::JackdawExtension + Default>(
+        &mut self,
+        ctor: impl Fn() -> Box<dyn crate::JackdawExtension> + Send + Sync + 'static,
+    ) -> &mut Self {
+        let ext = ctor();
+        let name = ext.name();
+        register_extension(self, name, ctor);
+        self
+    }
+}
+
 /// Extension trait on [`World`] for calling operators by id.
 ///
 /// Usage:
