@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use crate::prelude::OperatorSystemId;
 use crate::snapshot::SceneSnapshot;
+use bevy::ecs::component::ComponentId;
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 
@@ -25,7 +26,8 @@ pub(super) fn plugin(app: &mut App) {
         .add_observer(deindex_and_cleanup_operator_on_remove)
         .add_observer(cleanup_window_on_remove)
         .add_observer(cleanup_workspace_on_remove)
-        .add_observer(cleanup_panel_extension_on_remove);
+        .add_observer(cleanup_panel_extension_on_remove)
+        .add_observer(cleanup_resource_on_remove);
 }
 
 /// Root component for an extension.
@@ -38,6 +40,32 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Component, Debug)]
 pub struct Extension {
     pub name: String,
+}
+
+/// [`Resource`]s attached to a specific [`Extension`].
+/// When the extension is unloaded, these resources are removed via [`World::remove_resource_by_id`].
+#[derive(Component, Default, Debug, PartialEq, Eq, Deref)]
+#[relationship_target(relationship = ExtensionResourceOf, linked_spawn)]
+pub(crate) struct ExtensionResources(Vec<Entity>);
+
+/// Link from an entity representing a [`Resource`] to its owning [`Extension`], ensuring
+/// that the resource is removed when the extension is unloaded.
+#[derive(Component, Debug, PartialEq, Eq)]
+#[relationship(relationship_target = ExtensionResources)]
+pub(crate) struct ExtensionResourceOf {
+    #[relationship]
+    pub(crate) entity: Entity,
+    pub(crate) resource_id: ResourceId,
+}
+
+/// The [`ComponentId`] of a [`Resource`]
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ResourceId(pub(crate) ComponentId);
+
+impl Default for ResourceId {
+    fn default() -> Self {
+        Self(ComponentId::new(0))
+    }
 }
 
 /// Child of an [`Extension`]; represents a single operator.
@@ -242,6 +270,7 @@ impl ExtensionAppExt for App {
         self.world_mut()
             .resource_mut::<ExtensionCatalog>()
             .register(T::name(), T::kind(), ctor);
+        T::register_input_context(self);
         self
     }
 }
@@ -326,4 +355,18 @@ pub(crate) fn cleanup_panel_extension_on_remove(
     if let Ok(r) = registrations.get(trigger.event_target()) {
         registry.remove(&r.panel_id, r.section_index);
     }
+}
+
+fn cleanup_resource_on_remove(
+    trigger: On<Remove, ExtensionResourceOf>,
+    resource_id: Query<&ExtensionResourceOf>,
+    mut commands: Commands,
+) {
+    let Ok(relation) = resource_id.get(trigger.entity) else {
+        return;
+    };
+    let component_id = relation.resource_id.0;
+    commands.queue(move |world: &mut World| {
+        world.remove_resource_by_id(component_id);
+    });
 }

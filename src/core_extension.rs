@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_enhanced_input::prelude::*;
 use jackdaw_api::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
@@ -16,7 +17,15 @@ impl JackdawExtension for JackdawCoreExtension {
         ExtensionKind::Builtin
     }
 
-    fn register(&self, _ctx: &mut ExtensionContext) {
-        // todo: move as much builtin functionality into operators here as possible!
+    fn register(&self, ctx: &mut ExtensionContext) {
+        ctx.entity_mut().insert(CoreExtensionInputContext);
+        crate::draw_brush::add_to_extension(ctx);
+    }
+
+    fn register_input_context(app: &mut App) {
+        app.add_input_context::<CoreExtensionInputContext>();
     }
 }
+
+#[derive(Component, Default)]
+pub struct CoreExtensionInputContext;

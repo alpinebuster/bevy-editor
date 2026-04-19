@@ -272,6 +272,7 @@ fn dispatch_operator(
     settings: CallOperatorSettings,
 ) -> Result<OperatorResult, CallOperatorError> {
     let id = id.into();
+    info!("OPERATOR: {id}");
     let params = params.into();
 
     if let Some(active_id) = world.resource::<ActiveModalOperator>().id {

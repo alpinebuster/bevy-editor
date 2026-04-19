@@ -54,9 +54,8 @@ pub mod snapshot;
 
 use std::sync::Arc;
 
-use bevy::ecs::world::EntityWorldMut;
+use bevy::ecs::{system::IntoObserverSystem, world::EntityWorldMut};
 use bevy::prelude::*;
-use bevy_enhanced_input::EnhancedInputPlugin;
 use jackdaw_panels::{
     DockWindowDescriptor, WindowRegistry, WorkspaceDescriptor, WorkspaceRegistry,
 };
@@ -68,6 +67,7 @@ use snapshot::{ActiveSnapshotter, SceneSnapshot};
 pub use jackdaw_api_macros as macros;
 pub use jackdaw_jsn as jsn;
 
+use crate::lifecycle::{ExtensionResourceOf, ResourceId};
 use crate::{
     lifecycle::{
         ExtensionKind, OperatorEntity, RegisteredMenuEntry, RegisteredPanelExtension,
@@ -126,8 +126,13 @@ pub trait JackdawExtension: Send + Sync + 'static + DynJackdawExtension {
     ///
     /// Defaults to no-op; override only if the extension adds BEI
     /// contexts.
+    // TODO: this leaks memory when the extension is disabled
     #[expect(unused_variables, reason = "The default implementation does nothing")]
-    fn register_input_contexts(&self, app: &mut App) {}
+    fn register_input_context(app: &mut App)
+    where
+        Self: Sized,
+    {
+    }
 
     /// Main registration logic. Called each time the extension is
     /// enabled. Spawn operators, windows, BEI action entities, and any
@@ -150,6 +155,8 @@ pub trait DynJackdawExtension {
     fn dyn_name(&self) -> String;
     /// Returns [`JackdawExtension::kind`] via dynamic dispatch.
     fn dyn_kind(&self) -> ExtensionKind;
+    /// Registers input contexts for this extension.
+    fn dyn_register_input_contexts(&self, app: &mut App);
 }
 
 impl<T: JackdawExtension> DynJackdawExtension for T {
@@ -159,6 +166,10 @@ impl<T: JackdawExtension> DynJackdawExtension for T {
 
     fn dyn_kind(&self) -> ExtensionKind {
         T::kind()
+    }
+
+    fn dyn_register_input_contexts(&self, app: &mut App) {
+        T::register_input_context(app)
     }
 }
 
@@ -184,16 +195,43 @@ impl<'a> ExtensionContext<'a> {
         }
     }
 
-    /// Direct access to the underlying `World`. Extensions that need to
-    /// insert resources or spawn additional entities use this.
-    pub fn world(&mut self) -> &mut World {
-        self.world
+    /// Calls [`World::init_resource`] to initialize a resource, ensuring that it is removed on unload.
+    pub fn init_resource<T: Resource + Default>(&mut self) -> &mut Self {
+        let id = self.world.init_resource::<T>();
+        self.world.spawn(ExtensionResourceOf {
+            entity: self.id(),
+            resource_id: ResourceId(id),
+        });
+        self
     }
 
-    /// The root [`Extension`](lifecycle::Extension) entity. Useful when an extension wants to
-    /// spawn additional child entities that should be torn down on
-    /// unload.
-    pub fn entity(&self) -> Entity {
+    /// Calls [`World::insert_resource`] to initialize a resource, ensuring that it is removed on unload.
+    pub fn insert_resource<T: Resource>(&mut self, resource: T) -> &mut Self {
+        self.world.insert_resource(resource);
+        let id = self
+            .world
+            .resource_id::<T>()
+            .expect("resource_id should be Some since resource was just inserted");
+        self.world.spawn(ExtensionResourceOf {
+            entity: self.id(),
+            resource_id: ResourceId(id),
+        });
+        self
+    }
+
+    /// Calls [`World::add_observer`] to initialize an observer, ensuring that it is removed on unload.
+    pub fn add_observer<E: Event, B: Bundle, M>(
+        &mut self,
+        system: impl IntoObserverSystem<E, B, M>,
+    ) -> &mut Self {
+        self.entity_mut().with_child(Observer::new(system));
+        self
+    }
+
+    /// The root [`Extension`](lifecycle::Extension) entity.
+    ///
+    /// See also: [`ExtensionContext::entity`] and [`ExtensionContext::entity_mut`].
+    pub fn id(&self) -> Entity {
         self.extension_entity
     }
 
@@ -241,6 +279,22 @@ impl<'a> ExtensionContext<'a> {
         let mut ec = self.world.spawn(bundle);
         ec.insert(ChildOf(ext));
         ec
+    }
+
+    /// Get the extension's root entity. Useful for inserting components that you want to
+    /// be torn down on unload.
+    ///
+    /// See also: [`ExtensionContext::entity_mut`].
+    pub fn entity<'w>(&'w self) -> EntityRef<'w> {
+        self.world.entity(self.extension_entity)
+    }
+
+    /// Get the extension's root entity mutably. Useful for inserting components that you want to
+    /// be torn down on unload.
+    ///
+    /// See also: [`ExtensionContext::entity`].
+    pub fn entity_mut<'w>(&'w mut self) -> EntityWorldMut<'w> {
+        self.world.entity_mut(self.extension_entity)
     }
 
     /// Register an operator. Spawns an `OperatorEntity` as a child
@@ -424,10 +478,6 @@ pub struct ExtensionLoaderPlugin;
 
 impl Plugin for ExtensionLoaderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(EnhancedInputPlugin).add_plugins((
-            lifecycle::plugin,
-            operator::plugin,
-            registries::plugin,
-        ));
+        app.add_plugins((lifecycle::plugin, operator::plugin, registries::plugin));
     }
 }

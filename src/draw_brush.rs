@@ -1,13 +1,6 @@
-use bevy::{
-    input_focus::InputFocus,
-    light::{NotShadowCaster, NotShadowReceiver},
-    mesh::{Indices, PrimitiveTopology},
-    picking::mesh_picking::ray_cast::{MeshRayCast, MeshRayCastSettings, RayCastVisibility},
-    prelude::*,
-    ui::UiGlobalTransform,
-};
-
+use crate::core_extension::CoreExtensionInputContext;
 use crate::default_style;
+use crate::prelude::*;
 use crate::{
     EditorEntity,
     brush::{BrushFaceEntity, BrushMaterialPalette},
@@ -20,12 +13,57 @@ use crate::{
     viewport::{MainViewportCamera, SceneViewport},
     viewport_util::window_to_viewport_cursor,
 };
+use bevy::{
+    input_focus::InputFocus,
+    light::{NotShadowCaster, NotShadowReceiver},
+    mesh::{Indices, PrimitiveTopology},
+    picking::mesh_picking::ray_cast::{MeshRayCast, MeshRayCastSettings, RayCastVisibility},
+    prelude::*,
+    ui::UiGlobalTransform,
+};
 use jackdaw_geometry::{
     brush_planes_to_world, brushes_intersect, clean_degenerate_faces, compute_brush_geometry,
     compute_face_tangent_axes, compute_face_uvs, intersect_brushes, subtract_brush,
     triangulate_face,
 };
 use jackdaw_jsn::{Brush, BrushFaceData, BrushGroup, BrushPlane};
+
+pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
+    ctx.entity_mut()
+        .with_related::<ActionOf<CoreExtensionInputContext>>((
+            Action::<DrawBrush>::new(),
+            bindings![MouseButton::Left],
+        ));
+    ctx.register_operator::<ActivateDrawBrushModalOp>()
+        .register_operator::<AddBrushOp>()
+        .register_menu_entry(MenuEntryDescriptor {
+            menu: "Add".to_string(),
+            label: "Draw Brush".to_string(),
+            operator_id: ActivateDrawBrushModalOp::ID,
+        });
+    ctx.add_observer(on_draw_brush);
+}
+
+fn on_draw_brush(_: On<Fire<DrawBrush>>, state: ResMut<DrawBrushState>) {
+    if state.active.is_none() {
+        return;
+    }
+    info!("a");
+}
+
+#[derive(Component, InputAction)]
+#[action_output(bool)]
+struct DrawBrush;
+
+#[operator(id = "viewport.draw_brush_modal", modal = true)]
+pub fn activate_draw_brush_modal(_: In<OperatorParameters>) -> OperatorResult {
+    OperatorResult::Running
+}
+
+#[operator(id = "mesh.add_brush")]
+pub fn add_brush(params: In<OperatorParameters>) -> OperatorResult {
+    OperatorResult::Finished
+}
 
 const EXTRUDE_DEPTH_SENSITIVITY: f32 = 0.003;
 const MIN_FOOTPRINT_SIZE: f32 = 0.01;

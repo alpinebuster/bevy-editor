@@ -123,6 +123,9 @@ impl Plugin for EditorPlugin {
             .add_plugins((
                 FeathersPlugins.build().disable::<InputDispatchPlugin>(),
                 EditorFeathersPlugin,
+                EnhancedInputPlugin,
+            ))
+            .add_plugins((
                 jackdaw_jsn::JsnPlugin {
                     runtime_mesh_rebuild: false,
                 },
