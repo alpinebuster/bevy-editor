@@ -89,7 +89,6 @@ pub mod prelude {
         operator::{
             CallOperatorSettings, ExecutionContext, Operator, OperatorResult, OperatorWorldExt as _,
         },
-        props,
         snapshot::{ActiveSnapshotter, SceneSnapshot, SceneSnapshotter},
     };
     // BEI types extension authors need for `actions!` / `bindings!` / observers.
@@ -410,22 +409,6 @@ pub struct PanelContext {
 }
 
 pub type SectionBuildFn = Arc<dyn Fn(&mut World, PanelContext) + Send + Sync>;
-
-#[macro_export]
-macro_rules! props {
-    () => {
-        ::jackdaw_api::jsn::CustomProperties::default()
-    };
-    ($($key:expr => $value:expr),* $(,)?) => {
-        {
-            let mut props = ::jackdaw_api::jsn::CustomProperties::default();
-            $(
-                props.properties.insert($key.into(), $value.into());
-            )*
-            props
-        }
-    };
-}
 
 /// Plugin that wires up the extension framework into the editor.
 ///
