@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use bevy::{input_focus::InputFocus, prelude::*, ui::ui_transform::UiGlobalTransform};
 use bevy_monitors::prelude::{Mutation, NotifyChanged};
+use jackdaw_api::CallOperatorSettings;
 use jackdaw_feathers::{
     context_menu::spawn_context_menu,
     icons::IconFont,
@@ -1015,7 +1016,14 @@ fn on_context_menu_action(
             let operator_id = action.strip_prefix("op:").unwrap().to_string();
             commands.queue(move |world: &mut World| {
                 use jackdaw_api::OperatorWorldExt;
-                let _ = world.call_operator(operator_id, CustomProperties::default());
+                let _ = world.call_operator_with(
+                    operator_id,
+                    CustomProperties::default(),
+                    CallOperatorSettings {
+                        execution_context: jackdaw_api::lifecycle::ExecutionContext::Invoke,
+                        ..default()
+                    },
+                );
             });
         }
         _ => {}

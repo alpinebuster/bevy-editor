@@ -56,7 +56,7 @@ use bevy::{
     picking::hover::HoverMap,
     prelude::*,
 };
-use jackdaw_api::prelude::ExtensionAppExt;
+use jackdaw_api::prelude::*;
 use jackdaw_feathers::EditorFeathersPlugin;
 use jackdaw_feathers::dialog::EditorDialog;
 use jackdaw_jsn::CustomProperties;
@@ -2106,7 +2106,14 @@ fn handle_menu_action(event: On<MenuAction>, mut commands: Commands) {
             let operator_id = action.strip_prefix("op:").unwrap().to_string();
             commands.queue(move |world: &mut World| {
                 use jackdaw_api::OperatorWorldExt;
-                let _ = world.call_operator(operator_id, CustomProperties::default());
+                let _ = world.call_operator_with(
+                    operator_id,
+                    CustomProperties::default(),
+                    CallOperatorSettings {
+                        execution_context: ExecutionContext::Invoke,
+                        ..default()
+                    },
+                );
             });
         }
         action if action.starts_with("window.") => {

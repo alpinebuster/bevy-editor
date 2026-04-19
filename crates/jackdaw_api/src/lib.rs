@@ -82,11 +82,13 @@ pub use snapshot::{ActiveSnapshotter, SceneSnapshot, SceneSnapshotter};
 
 pub use jackdaw_jsn as jsn;
 
+use crate::lifecycle::ExecutionContext;
+
 /// Re-exports plugin authors will want in one import.
 pub mod prelude {
     pub use crate::lifecycle::{
-        CallOperatorError, CallOperatorSettings, Extension, ExtensionAppExt, ExtensionCatalog,
-        ExtensionKind, OperatorEntity, OperatorIndex, OperatorWorldExt,
+        CallOperatorError, CallOperatorSettings, ExecutionContext, Extension, ExtensionAppExt,
+        ExtensionCatalog, ExtensionKind, OperatorEntity, OperatorIndex, OperatorWorldExt,
     };
     pub use crate::operator::{Operator, OperatorResult};
     pub use crate::{
@@ -287,7 +289,14 @@ impl<'a> ExtensionContext<'a> {
                       mut commands: Commands| {
                     commands.queue(move |world: &mut World| {
                         use crate::OperatorWorldExt;
-                        let _ = world.call_operator(O::ID, CustomProperties::default());
+                        let _ = world.call_operator_with(
+                            O::ID,
+                            CustomProperties::default(),
+                            CallOperatorSettings {
+                                execution_context: ExecutionContext::Invoke,
+                                ..default()
+                            },
+                        );
                     });
                 },
             );
