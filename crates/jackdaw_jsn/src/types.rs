@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap},
+};
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -241,8 +244,15 @@ impl From<String> for PropertyValue {
         Self::String(value)
     }
 }
+
 impl From<&str> for PropertyValue {
     fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for PropertyValue {
+    fn from(value: Cow<'a, str>) -> Self {
         Self::String(value.to_string())
     }
 }
