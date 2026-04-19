@@ -142,7 +142,6 @@ impl Plugin for EditorPlugin {
             .add_plugins(keybinds::KeybindsPlugin)
             .add_plugins(keybind_settings::KeybindSettingsPlugin)
             .add_plugins((
-                core_extension::plugin,
                 viewport_overlays::ViewportOverlaysPlugin,
                 view_modes::ViewModesPlugin,
                 status_bar::StatusBarPlugin,
@@ -248,7 +247,8 @@ impl Plugin for EditorPlugin {
         // Runs during `build()` so BEI's `finish()` hook sees every
         // context type. Built-ins override `kind()` to `Builtin`; the
         // rest default to `Custom`.
-        app.register_extension::<CoreWindowsExtension>()
+        app.add_plugins(core_extension::plugin)
+            .register_extension::<CoreWindowsExtension>()
             .register_extension::<AssetBrowserExtension>()
             .register_extension::<TimelineExtension>()
             .register_extension::<TerminalExtension>()
