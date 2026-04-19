@@ -207,21 +207,6 @@ pub struct CustomProperties {
     pub properties: BTreeMap<String, PropertyValue>,
 }
 
-impl<S, P> FromIterator<(S, P)> for CustomProperties
-where
-    S: Into<String>,
-    P: Into<PropertyValue>,
-{
-    fn from_iter<T: IntoIterator<Item = (S, P)>>(iter: T) -> Self {
-        Self {
-            properties: iter
-                .into_iter()
-                .map(|(s, v)| (s.into(), v.into()))
-                .collect(),
-        }
-    }
-}
-
 #[derive(Reflect, Clone, Debug, PartialEq)]
 pub enum PropertyValue {
     Bool(bool),
