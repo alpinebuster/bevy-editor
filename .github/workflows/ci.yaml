@@ -61,7 +61,6 @@ jobs:
 
       - name: Run doctests
         run: cargo test --locked --workspace --doc
-        continue-on-error: true
 
   # Run clippy lints.
   clippy:

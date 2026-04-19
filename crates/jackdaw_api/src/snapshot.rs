@@ -33,5 +33,5 @@ pub trait SceneSnapshotter: Send + Sync + 'static {
 
 /// The active snapshotter. Inserted once at plugin setup. Swapped on
 /// BSN migration.
-#[derive(Resource)]
+#[derive(Resource, Deref, DerefMut)]
 pub struct ActiveSnapshotter(pub Box<dyn SceneSnapshotter>);

@@ -41,7 +41,10 @@ pub struct GraphTerminalView {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// # use bevy::prelude::*;
+/// # use jackdaw_node_graph::{GraphNodeBody, GraphNode};
+///
 /// fn populate_constant_body(
 ///     added: Query<(Entity, &GraphNodeBody), Added<GraphNodeBody>>,
 ///     nodes: Query<&GraphNode>,

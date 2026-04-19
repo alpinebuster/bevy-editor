@@ -22,16 +22,16 @@ use syn::{
 /// - `modal`: `bool`, default `false`
 /// - `manual`: `bool`, default `false`. When `true`, no Fire observer
 ///   is wired up; callers invoke the operator via
-///   `World::call_operator`.
+///   `World::operator`.
 /// - `is_available`: path to a Bevy system returning `bool` that
 ///   decides whether the operator can run in the current editor
 ///   state. Runs before the execute system on every
-///   `World::call_operator` and via `World::is_operator_available`.
+///   `World::operator` and via `World::is_operator_available`.
 ///   If `false`, the operator returns `Cancelled` without executing.
 /// - `name`: override the generated struct name. Default is
 ///   `PascalCase(fn_name) + "Op"`.
 ///
-/// ```ignore
+/// ```rust,ignore
 /// use jackdaw_api::prelude::*;
 ///
 /// fn time_is_running(time: Res<Time>) -> bool {
@@ -39,7 +39,7 @@ use syn::{
 /// }
 ///
 /// #[operator(id = "sample.hello", label = "Hello", is_available = time_is_running)]
-/// fn hello() -> OperatorResult {
+/// fn hello(_: In<CustomProperties>) -> OperatorResult {
 ///     info!("hello");
 ///     OperatorResult::Finished
 /// }
@@ -157,7 +157,7 @@ pub fn operator(attr: TokenStream, item: TokenStream) -> TokenStream {
         #[action_output(bool)]
         #vis struct #struct_name;
 
-        impl ::jackdaw_api::Operator for #struct_name {
+        impl ::jackdaw_api::prelude::Operator for #struct_name {
             const ID: &'static str = #id;
             const LABEL: &'static str = #label;
             const DESCRIPTION: &'static str = #description;
@@ -166,7 +166,7 @@ pub fn operator(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             fn register_execute(
                 commands: &mut ::bevy::ecs::system::Commands,
-            ) -> ::bevy::ecs::system::SystemId<(), ::jackdaw_api::OperatorResult> {
+            ) -> ::bevy::ecs::system::SystemId<::bevy::ecs::system::In<::jackdaw_api::jsn::CustomProperties>, ::jackdaw_api::prelude::OperatorResult> {
                 commands.register_system(#fn_name)
             }
 

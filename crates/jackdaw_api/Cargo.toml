@@ -12,6 +12,7 @@ bevy_enhanced_input.workspace = true
 jackdaw_panels.workspace = true
 jackdaw_commands.workspace = true
 jackdaw_api_macros.workspace = true
+jackdaw_jsn.workspace = true
 
 [lints]
 workspace = true
