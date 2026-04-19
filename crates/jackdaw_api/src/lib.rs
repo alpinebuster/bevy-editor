@@ -8,28 +8,16 @@
 //!
 //! Minimal extension:
 //!
-//! ```ignore
+//! ```rust
 //! use bevy::prelude::*;
 //! use bevy_enhanced_input::prelude::*;
 //! use jackdaw_api::prelude::*;
 //!
-//! // An operator is also a BEI action, so one type covers both.
-//! #[derive(Default, InputAction)]
-//! #[action_output(bool)]
-//! struct PlaceCube;
-//!
-//! impl Operator for PlaceCube {
-//!     const ID: &'static str = "sample.place_cube";
-//!     const LABEL: &'static str = "Place Cube";
-//!     fn register_execute(commands: &mut Commands) -> SystemId<In<CustomProperties>, OperatorResult> {
-//!         commands.register_system(place_cube)
-//!     }
-//! }
-//!
-//! // Operators are plain Bevy systems. Mutate the world however you
-//! // like; the dispatcher snapshots the scene before invoke and diffs
-//! // after, so a single Ctrl+Z reverses the entire call.
-//! fn place_cube(mut commands: Commands) -> OperatorResult {
+//! #[operator(id = "sample.place_cube")]
+//! fn place_cube(_: In<CustomProperties>, mut commands: Commands) -> OperatorResult {
+//!     // Operators are plain Bevy systems. Mutate the world however you
+//!     // like; the dispatcher snapshots the scene before invoke and diffs
+//!     // after, so a single Ctrl+Z reverses the entire call.
 //!     commands.spawn((Name::new("Cube"), Transform::default()));
 //!     OperatorResult::Finished
 //! }
@@ -37,20 +25,24 @@
 //! #[derive(Component, Default)]
 //! struct SamplePluginContext;
 //!
-//! struct SamplePlugin;
+//! #[derive(Default)]
+//! struct MyCoolExtension;
 //!
-//! impl JackdawExtension for SamplePlugin {
-//!     fn name(&self) -> &str { "Sample Plugin" }
+//! impl JackdawExtension for MyCoolExtension {
+//!     fn name() -> String { "The coolest extension".into() }
 //!     fn register(&self, ctx: &mut ExtensionContext) {
-//!         ctx.register_operator::<PlaceCube>();
-//!         ctx.add_input_context::<SamplePluginContext>();
+//!         ctx.register_operator::<PlaceCubeOp>();
 //!         ctx.spawn((
 //!             SamplePluginContext,
 //!             actions!(SamplePluginContext[
-//!                 Action::<PlaceCube>::new(),
-//!                 bindings![KeyCode::C],
+//!                 // An operator is also a BEI action, so one type covers both.
+//!                 Action::<PlaceCubeOp>::new(),
+//!                 bindings![KeyCode::KeyC],
 //!             ]),
 //!         ));
+//!     }
+//!     fn register_input_contexts(&self, app: &mut App) {
+//!         app.add_input_context::<SamplePluginContext>();
 //!     }
 //! }
 //! ```
@@ -333,12 +325,15 @@ impl<'a> ExtensionContext<'a> {
     /// removed. When the extension unloads, its menu entries despawn
     /// with it and the menu rebuilds without them.
     ///
-    /// ```ignore
+    /// ```rust
+    /// # use jackdaw_api::prelude::*;
+    /// # fn test(mut ctx: ExtensionContext) {
     /// ctx.register_menu_entry(MenuEntryDescriptor {
     ///     menu: "Add".into(),
-    ///     label: "My Camera".into(),
-    ///     operator_id: PlaceMyCamera::ID,
+    ///     label: "Custom Camera".into(),
+    ///     operator_id: "my_extension.add_custom_camera",
     /// });
+    /// # }
     /// ```
     pub fn register_menu_entry(&mut self, descriptor: MenuEntryDescriptor) {
         let ext = self.extension_entity;

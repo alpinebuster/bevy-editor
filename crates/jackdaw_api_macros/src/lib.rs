@@ -31,7 +31,7 @@ use syn::{
 /// - `name`: override the generated struct name. Default is
 ///   `PascalCase(fn_name) + "Op"`.
 ///
-/// ```ignore
+/// ```rust,ignore
 /// use jackdaw_api::prelude::*;
 ///
 /// fn time_is_running(time: Res<Time>) -> bool {
@@ -39,7 +39,7 @@ use syn::{
 /// }
 ///
 /// #[operator(id = "sample.hello", label = "Hello", is_available = time_is_running)]
-/// fn hello() -> OperatorResult {
+/// fn hello(_: In<CustomProperties>) -> OperatorResult {
 ///     info!("hello");
 ///     OperatorResult::Finished
 /// }

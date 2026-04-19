@@ -19,36 +19,36 @@ pub(super) fn plugin(app: &mut App) {
 /// A Blender-style operator.
 ///
 /// The trait is bounded on [`InputAction`] so the operator type itself
-/// can be used as a BEI action:
+/// can be used as a BEI action.
+/// Usually you will want to use [`operator`] to define your operator, but it can be manually implemented if needed:
 ///
-/// ```ignore
+/// ```rust
 /// use bevy_enhanced_input::prelude::*;
+/// use jackdaw_api::prelude::*;
+/// use bevy::prelude::*;
 ///
 /// #[derive(Default, InputAction)]
 /// #[action_output(bool)]
-/// struct PlaceCube;
+/// struct PlaceCubeOp;
 ///
-/// impl Operator for PlaceCube {
+/// impl Operator for PlaceCubeOp {
 ///     const ID: &'static str = "sample.place_cube";
 ///     const LABEL: &'static str = "Place Cube";
 ///
-///     fn register_execute(commands: &mut Commands) -> SystemId<(), OperatorResult> {
-///         commands.register_system(place_cube_system)
+///     fn register_execute(commands: &mut Commands) -> SystemId<In<CustomProperties>, OperatorResult> {
+///         commands.register_system(place_cube)
 ///     }
+/// }
+///
+/// fn place_cube(_: In<CustomProperties>, mut commands: Commands) -> OperatorResult {
+///     commands.spawn((Name::new("Cube"), Transform::default()));
+///     OperatorResult::Finished
 /// }
 /// ```
 ///
 /// Extensions then bind the operator to a key via pure BEI syntax. Use
 /// BEI binding modifiers (`Press`, `Release`, `Hold`) when specific
-/// input timing is needed:
-///
-/// ```ignore
-/// ctx.spawn((
-///     MyPluginContext,
-///     actions!(MyPluginContext[
-///         (Action::<PlaceCube>::new(), bindings![KeyCode::C]),
-///     ]),
-/// ));
+/// input timing is needed. See the [jackdaw_api documentation](crate).
 /// ```
 pub trait Operator: InputAction + 'static {
     const ID: &'static str;
