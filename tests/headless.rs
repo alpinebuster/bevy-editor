@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use bevy::prelude::*;
 use jackdaw_api::prelude::*;
+
+use crate::util::OperatorResultExt as _;
 mod util;
 
 #[test]
@@ -26,7 +28,7 @@ fn can_run_extension() {
         app.world_mut()
             .call_operator(SampleExtension::SPAWN, CustomProperties::default())
             .unwrap()
-            .assert_finished_i_agree_to_only_use_this_in_integration_tests_and_not_production();
+            .assert_finished();
         app.update();
     }
 }
@@ -50,7 +52,7 @@ fn can_call_operator() {
     app.world_mut()
         .call_operator(SampleExtension::SPAWN, CustomProperties::default())
         .unwrap()
-        .assert_finished_i_agree_to_only_use_this_in_integration_tests_and_not_production();
+        .assert_finished();
 
     assert!(app.world_mut().contains_resource::<Marker>());
 }
@@ -67,11 +69,11 @@ fn can_pass_params_to_operator() {
             props!["foo" => "bar", "baz" => 42],
         )
         .unwrap()
-        .assert_finished_i_agree_to_only_use_this_in_integration_tests_and_not_production();
+        .assert_finished();
 }
 
 #[derive(Default)]
-pub struct SampleExtension;
+struct SampleExtension;
 
 impl SampleExtension {
     const SPAWN: &'static str = "sample.spawn";
@@ -98,9 +100,6 @@ impl JackdawExtension for SampleExtension {
 fn build_panel(world: &mut World, parent: Entity) {
     world.spawn((ChildOf(parent), Panel, Text::new("Some panel")));
 }
-
-#[derive(Component, Default)]
-pub struct SampleContext;
 
 #[operator(
     id = SampleExtension::SPAWN,

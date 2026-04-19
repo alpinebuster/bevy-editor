@@ -104,13 +104,3 @@ pub enum OperatorResult {
     /// operators that return `Running` collapse to `Finished`.
     Running,
 }
-
-impl OperatorResult {
-    /// Asserts that the operator finished successfully and panics if it did not.
-    /// This is a convenience method for use in automated testing.
-    ///
-    /// Do not use this when shipping your extension, as a panic would crash down the entire editor, potentially making the user lose unsaved work.
-    pub fn assert_finished_i_agree_to_only_use_this_in_integration_tests_and_not_production(self) {
-        assert_eq!(self, OperatorResult::Finished, "Operator failed to finish");
-    }
-}

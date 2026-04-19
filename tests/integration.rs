@@ -1,43 +1,48 @@
+use std::marker::PhantomData;
+
 use bevy::prelude::*;
 use jackdaw_api::prelude::*;
+
+use crate::util::OperatorResultExt as _;
 mod util;
 
 #[test]
 fn run_integration_tests() {
+    run_test::<IntegrationTestOneOp>();
+}
+
+#[operator(id = ID)]
+fn integration_test_one(_: In<CustomProperties>) -> OperatorResult {
+    // todo: fill in an actual test and write more!
+    OperatorResult::Finished
+}
+
+fn run_test<T: Operator + Send + Sync>() {
     let mut app = util::headless_app();
-    app.register_extension::<IntegrationTestsExtension>();
+    app.register_extension::<IntegrationTestsExtension<T>>();
     app.finish();
     app.update();
     app.world_mut()
-        .call_operator(IntegrationTestsExtension::TEST, props![])
+        .call_operator(ID, props![])
         .unwrap()
-        .assert_finished_i_agree_to_only_use_this_in_integration_tests_and_not_production();
+        .assert_finished();
 }
 
-#[derive(Default)]
-pub struct IntegrationTestsExtension;
-
-impl IntegrationTestsExtension {
-    const TEST: &'static str = "integration_test.run_test";
+pub struct IntegrationTestsExtension<T: Operator>(PhantomData<T>);
+impl<T: Operator> Default for IntegrationTestsExtension<T> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
 }
 
-impl JackdawExtension for IntegrationTestsExtension {
+impl<T: Operator + Send + Sync> JackdawExtension for IntegrationTestsExtension<T> {
     fn name() -> String {
         "Integration Tests".to_string()
     }
 
     fn register(&self, ctx: &mut ExtensionContext) {
-        ctx.register_operator::<IntegrationTestOp>();
+        ctx.register_operator::<T>();
     }
 }
 
-#[derive(Component, Default)]
-pub struct SampleContext;
-
-#[operator(
-    id = IntegrationTestsExtension::TEST,
-)]
-fn integration_test(_: In<CustomProperties>) -> OperatorResult {
-    // TODO: run integration tests here, possibly using the params to select which tests to run
-    OperatorResult::Finished
-}
+const ID: &str = "integration_test.run_test";
