@@ -45,8 +45,8 @@ pub struct ConnectionView {
 pub struct GhostConnection;
 
 /// Marker added to every `Connection` data entity whose source or target
-/// terminal is currently being hovered with Right Click held down. The 
-/// connection renderer fades wires carrying this marker to signal they'll 
+/// terminal is currently being hovered with Right Click held down. The
+/// connection renderer fades wires carrying this marker to signal they'll
 /// be removed on click.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct PendingRemove;
