@@ -207,6 +207,21 @@ pub struct CustomProperties {
     pub properties: BTreeMap<String, PropertyValue>,
 }
 
+impl<S, P> FromIterator<(S, P)> for CustomProperties
+where
+    S: Into<String>,
+    P: Into<PropertyValue>,
+{
+    fn from_iter<T: IntoIterator<Item = (S, P)>>(iter: T) -> Self {
+        Self {
+            properties: iter
+                .into_iter()
+                .map(|(s, v)| (s.into(), v.into()))
+                .collect(),
+        }
+    }
+}
+
 #[derive(Reflect, Clone, Debug, PartialEq)]
 pub enum PropertyValue {
     Bool(bool),
@@ -216,6 +231,53 @@ pub enum PropertyValue {
     Vec2(Vec2),
     Vec3(Vec3),
     Color(Color),
+}
+
+impl From<bool> for PropertyValue {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
+    }
+}
+
+impl From<i64> for PropertyValue {
+    fn from(value: i64) -> Self {
+        Self::Int(value)
+    }
+}
+
+impl From<f64> for PropertyValue {
+    fn from(value: f64) -> Self {
+        Self::Float(value)
+    }
+}
+
+impl From<String> for PropertyValue {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+impl From<&str> for PropertyValue {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl From<Vec2> for PropertyValue {
+    fn from(value: Vec2) -> Self {
+        Self::Vec2(value)
+    }
+}
+
+impl From<Vec3> for PropertyValue {
+    fn from(value: Vec3) -> Self {
+        Self::Vec3(value)
+    }
+}
+
+impl From<Color> for PropertyValue {
+    fn from(value: Color) -> Self {
+        Self::Color(value)
+    }
 }
 
 impl PropertyValue {

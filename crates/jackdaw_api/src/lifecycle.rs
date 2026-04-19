@@ -293,14 +293,14 @@ pub trait OperatorWorldExt {
     fn call_operator(
         &mut self,
         id: impl Into<Cow<'static, str>>,
-        params: CustomProperties,
+        params: impl Into<CustomProperties>,
     ) -> Result<OperatorResult, CallOperatorError>;
 
     /// Call an operator with explicit settings.
     fn call_operator_with(
         &mut self,
         id: impl Into<Cow<'static, str>>,
-        params: CustomProperties,
+        params: impl Into<CustomProperties>,
         settings: CallOperatorSettings,
     ) -> Result<OperatorResult, CallOperatorError>;
 
@@ -369,15 +369,15 @@ impl OperatorWorldExt for World {
     fn call_operator(
         &mut self,
         id: impl Into<Cow<'static, str>>,
-        params: CustomProperties,
+        params: impl Into<CustomProperties>,
     ) -> Result<OperatorResult, CallOperatorError> {
-        self.call_operator_with(id, params, CallOperatorSettings::default())
+        self.call_operator_with(id, params.into(), CallOperatorSettings::default())
     }
 
     fn call_operator_with(
         &mut self,
         id: impl Into<Cow<'static, str>>,
-        params: CustomProperties,
+        params: impl Into<CustomProperties>,
         settings: CallOperatorSettings,
     ) -> Result<OperatorResult, CallOperatorError> {
         let id = id.into();
@@ -410,10 +410,13 @@ impl OperatorWorldExt for World {
 
 fn dispatch_operator(
     world: &mut World,
-    id: Cow<'static, str>,
-    params: CustomProperties,
+    id: impl Into<Cow<'static, str>>,
+    params: impl Into<CustomProperties>,
     settings: CallOperatorSettings,
 ) -> Result<OperatorResult, CallOperatorError> {
+    let id = id.into();
+    let params = params.into();
+
     if let Some(active_id) = world.resource::<ActiveModalOperator>().id {
         return Err(CallOperatorError::ModalAlreadyActive(active_id));
     }

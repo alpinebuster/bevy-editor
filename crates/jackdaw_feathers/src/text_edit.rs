@@ -402,6 +402,8 @@ fn setup_text_edit_input(
             )
             .id();
 
+        // FIXME: in some situations, `entity` will already be despawned for some reason,
+        // causing an error here.
         commands.entity(entity).add_child(wrapper_entity);
 
         if is_numeric && !config.drag_bottom && !config.disabled {

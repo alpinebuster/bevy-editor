@@ -289,7 +289,7 @@ impl<'a> ExtensionContext<'a> {
                       mut commands: Commands| {
                     commands.queue(move |world: &mut World| {
                         use crate::OperatorWorldExt;
-                        let _ = world.call_operator(O::ID, default());
+                        let _ = world.call_operator(O::ID, CustomProperties::default());
                     });
                 },
             );

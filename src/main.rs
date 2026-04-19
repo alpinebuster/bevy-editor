@@ -10,6 +10,9 @@ fn main() -> AppExit {
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
     App::new()
+        // The default error handler panics, which we never *ever* want to happen to the editor.
+        // So let's log an error instead.
+        .set_error_handler(bevy::ecs::error::error)
         .add_plugins(
             DefaultPlugins
                 .set(AssetPlugin {

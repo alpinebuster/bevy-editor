@@ -49,7 +49,7 @@ fn can_run_extension() {
     for _ in 0..10 {
         let result = app
             .world_mut()
-            .call_operator(SampleExtension::SPAWN, default())
+            .call_operator(SampleExtension::SPAWN, CustomProperties::default())
             .unwrap();
         assert_eq!(result, OperatorResult::Finished);
         app.update();
@@ -74,7 +74,7 @@ fn can_call_operator() {
 
     let result = app
         .world_mut()
-        .call_operator(SampleExtension::SPAWN, default())
+        .call_operator(SampleExtension::SPAWN, CustomProperties::default())
         .unwrap();
     assert_eq!(result, OperatorResult::Finished);
 
@@ -88,8 +88,7 @@ fn can_pass_params_to_operator() {
     app.finish();
     app.update();
 
-    let mut params = CustomProperties::default();
-    params.insert("foo".to_string(), PropertyValue::String("bar".to_string()));
+    let params = [("foo", "bar")].into_iter().collect::<CustomProperties>();
 
     let result = app
         .world_mut()

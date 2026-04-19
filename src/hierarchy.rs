@@ -25,7 +25,7 @@ use crate::{
     selection::{Selected, Selection},
 };
 use jackdaw_feathers::dialog::{DialogActionEvent, DialogChildrenSlot};
-use jackdaw_jsn::BrushGroup;
+use jackdaw_jsn::{BrushGroup, CustomProperties};
 
 /// Stores the default name for the template save dialog.
 #[derive(Resource, Default)]
@@ -1015,7 +1015,7 @@ fn on_context_menu_action(
             let operator_id = action.strip_prefix("op:").unwrap().to_string();
             commands.queue(move |world: &mut World| {
                 use jackdaw_api::OperatorWorldExt;
-                let _ = world.call_operator(operator_id, default());
+                let _ = world.call_operator(operator_id, CustomProperties::default());
             });
         }
         _ => {}
