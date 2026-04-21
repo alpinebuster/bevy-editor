@@ -1,9 +1,6 @@
 use bevy::prelude::*;
 use bevy_enhanced_input::prelude::*;
-use jackdaw_api::{
-    lifecycle::{ActiveModalOperator, OperatorEntity},
-    prelude::*,
-};
+use jackdaw_api::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
     app.register_extension::<JackdawCoreExtension>();

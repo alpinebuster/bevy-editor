@@ -57,8 +57,8 @@ use bevy::{
     prelude::*,
 };
 use jackdaw_api::prelude::*;
-use jackdaw_feathers::EditorFeathersPlugin;
 use jackdaw_feathers::dialog::EditorDialog;
+use jackdaw_feathers::{EditorFeathersPlugin, tooltip::Tooltip};
 use jackdaw_widgets::menu_bar::MenuAction;
 use selection::Selection;
 use viewable_camera_extension::ViewableCameraExtension;
@@ -216,7 +216,6 @@ impl Plugin for EditorPlugin {
                 (
                     send_scroll_events,
                     layout::update_toolbar_highlights,
-                    layout::update_toolbar_tooltips,
                     layout::update_space_toggle_label,
                     layout::update_edit_tool_highlights,
                     layout::update_active_document_display,
@@ -549,29 +548,19 @@ fn decorate_timeline_tooltips(
     mut commands: Commands,
 ) {
     for e in &play {
-        commands
-            .entity(e)
-            .insert(layout::ToolbarTooltip("Play".into()));
+        commands.entity(e).insert(Tooltip("Play".into()));
     }
     for e in &pause {
-        commands
-            .entity(e)
-            .insert(layout::ToolbarTooltip("Pause".into()));
+        commands.entity(e).insert(Tooltip("Pause".into()));
     }
     for e in &stop {
-        commands
-            .entity(e)
-            .insert(layout::ToolbarTooltip("Stop".into()));
+        commands.entity(e).insert(Tooltip("Stop".into()));
     }
     for e in &new_clip {
-        commands
-            .entity(e)
-            .insert(layout::ToolbarTooltip("New Clip".into()));
+        commands.entity(e).insert(Tooltip("New Clip".into()));
     }
     for e in &new_blend {
-        commands
-            .entity(e)
-            .insert(layout::ToolbarTooltip("New Blend Graph".into()));
+        commands.entity(e).insert(Tooltip("New Blend Graph".into()));
     }
 }
 

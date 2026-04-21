@@ -5,12 +5,12 @@ use jackdaw_feathers::{
     menu_bar, panel_header, popover, separator, split_panel, status_bar,
     text_edit::{self, TextEditProps},
     tokens,
+    tooltip::Tooltip,
     tree_view::tree_container_drop_observers,
 };
 
 use crate::{
     EditorEntity,
-    asset_browser::ActiveTooltip,
     brush::{BrushEditMode, BrushSelection, EditMode},
     draw_brush::{ActivateDrawBrushModalOp, DrawBrushState},
     gizmos::{GizmoMode, GizmoSpace},
@@ -122,10 +122,6 @@ pub enum EditToolButton {
     Physics,
     Operator(&'static str),
 }
-
-/// Stores tooltip text for toolbar buttons (used with `Hovered` component).
-#[derive(Component)]
-pub struct ToolbarTooltip(pub String);
 
 /// Marker for keybind helper button
 #[derive(Component)]
@@ -604,7 +600,7 @@ fn toolbar_button(
     (
         GizmoModeButton(mode),
         Hovered::default(),
-        ToolbarTooltip(tooltip.into()),
+        Tooltip(tooltip.into()),
         Node {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
@@ -645,7 +641,7 @@ fn toolbar_space_button(icon_font: Handle<Font>) -> impl Bundle {
     (
         GizmoSpaceButton,
         Hovered::default(),
-        ToolbarTooltip("Toggle World/Local (X)".into()),
+        Tooltip("Toggle World/Local (X)".into()),
         Node {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
@@ -692,7 +688,7 @@ fn toolbar_edit_button(
     (
         tool,
         Hovered::default(),
-        ToolbarTooltip(tooltip.into()),
+        Tooltip(tooltip.into()),
         Node {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
@@ -1185,41 +1181,6 @@ pub fn update_toolbar_highlights(
         } else {
             tokens::TOOLBAR_BUTTON_BG
         };
-    }
-}
-
-/// Shows/hides toolbar tooltips based on `Hovered` state (flicker-free).
-pub fn update_toolbar_tooltips(
-    buttons: Query<(Entity, &ToolbarTooltip, &Hovered), Changed<Hovered>>,
-    mut commands: Commands,
-    mut active: ResMut<ActiveTooltip>,
-) {
-    for (entity, tooltip, hovered) in &buttons {
-        if hovered.get() {
-            if let Some(old) = active.0.take() {
-                commands.entity(old).try_despawn();
-            }
-            let tip = commands
-                .spawn(popover::popover(
-                    popover::PopoverProps::new(entity)
-                        .with_placement(popover::PopoverPlacement::Bottom)
-                        .with_padding(4.0)
-                        .with_z_index(300),
-                ))
-                .id();
-            commands.spawn((
-                Text::new(tooltip.0.clone()),
-                TextFont {
-                    font_size: tokens::FONT_SM,
-                    ..Default::default()
-                },
-                TextColor(tokens::TEXT_PRIMARY),
-                ChildOf(tip),
-            ));
-            active.0 = Some(tip);
-        } else if let Some(old) = active.0.take() {
-            commands.entity(old).try_despawn();
-        }
     }
 }
 

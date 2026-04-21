@@ -47,7 +47,7 @@ pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
         .register_operator::<AddBrushOp>()
         .register_menu_entry(MenuEntryDescriptor {
             menu: "Add".to_string(),
-            label: "Draw Brush".to_string(),
+            label: ActivateDrawBrushModalOp::LABEL.to_string(),
             operator_id: ActivateDrawBrushModalOp::ID,
         });
     ctx.add_observer(on_draw_brush);
@@ -57,7 +57,7 @@ pub(crate) fn add_to_extension(ctx: &mut ExtensionContext) {
 #[action_output(bool)]
 struct DrawBrush;
 
-#[operator(id = "viewport.draw_brush_modal", cancel = cancel_draw_brush_modal, modal = true)]
+#[operator(id = "viewport.draw_brush_modal", label = "Draw Brush", cancel = cancel_draw_brush_modal, modal = true)]
 pub fn activate_draw_brush_modal(
     _: In<OperatorParameters>,
     mut input_focus: ResMut<InputFocus>,
