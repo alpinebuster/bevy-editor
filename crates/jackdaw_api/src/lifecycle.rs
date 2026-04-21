@@ -280,9 +280,9 @@ pub trait ExtensionAppExt {
     ///
     /// Call this once per extension during app setup. Registering the constructor
     /// lets the Plugins dialog list the extension; running
-    /// `register_input_contexts` ensures its BEI context types are known to the
+    /// `register_input_context` ensures its BEI context types are known to the
     /// framework. Enabling and disabling the extension later only re-runs
-    /// `register()`, never `register_input_contexts()` (BEI panics on duplicate
+    /// `register()`, never `register_input_context()` (BEI panics on duplicate
     /// registrations).
     ///
     /// See also [`Self::register_extension_with`].

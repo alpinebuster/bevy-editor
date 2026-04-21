@@ -41,7 +41,7 @@
 //!             ]),
 //!         ));
 //!     }
-//!     fn register_input_contexts(&self, app: &mut App) {
+//!     fn register_input_context(app: &mut App) {
 //!         app.add_input_context::<SamplePluginContext>();
 //!     }
 //! }
@@ -156,7 +156,7 @@ pub trait DynJackdawExtension {
     /// Returns [`JackdawExtension::kind`] via dynamic dispatch.
     fn dyn_kind(&self) -> ExtensionKind;
     /// Registers input contexts for this extension.
-    fn dyn_register_input_contexts(&self, app: &mut App);
+    fn dyn_register_input_context(&self, app: &mut App);
 }
 
 impl<T: JackdawExtension> DynJackdawExtension for T {
@@ -168,7 +168,7 @@ impl<T: JackdawExtension> DynJackdawExtension for T {
         T::kind()
     }
 
-    fn dyn_register_input_contexts(&self, app: &mut App) {
+    fn dyn_register_input_context(&self, app: &mut App) {
         T::register_input_context(app)
     }
 }
@@ -180,7 +180,7 @@ impl<T: JackdawExtension> DynJackdawExtension for T {
 /// loaded from world-only contexts such as the Extensions dialog's
 /// enable/disable observer. One-time setup that genuinely requires App
 /// access (BEI input-context registration) runs through
-/// [`JackdawExtension::register_input_contexts`] at catalog-registration
+/// [`JackdawExtension::register_input_context`] at catalog-registration
 /// time.
 pub struct ExtensionContext<'a> {
     world: &'a mut World,
