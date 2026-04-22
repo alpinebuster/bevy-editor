@@ -22,7 +22,7 @@ pub const REQUIRED_EXTENSIONS: &[&str] = &[crate::core_extension::CORE_EXTENSION
 /// True if the named extension is load-bearing and must not be
 /// user-toggleable.
 pub fn is_required(name: &str) -> bool {
-    REQUIRED_EXTENSIONS.iter().any(|n| *n == name)
+    REQUIRED_EXTENSIONS.contains(&name)
 }
 
 /// On-disk shape.
