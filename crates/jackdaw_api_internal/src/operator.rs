@@ -206,8 +206,13 @@ pub struct CallOperatorSettings {
 
 impl Default for CallOperatorSettings {
     fn default() -> Self {
+        // Match the docstring on `creates_history_entry`: the common
+        // case (user-invoked operators like material apply) should
+        // push an undo entry. Operators that are view-local and
+        // shouldn't be undoable either set `allows_undo = false` on
+        // the operator itself or override this on the call site.
         Self {
-            creates_history_entry: false,
+            creates_history_entry: true,
             execution_context: default(),
         }
     }
