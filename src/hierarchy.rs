@@ -259,6 +259,7 @@ fn is_outliner_child(world: &World, child: Entity) -> bool {
     world.get_entity(child).is_ok()
         && world.get::<EditorEntity>(child).is_none()
         && world.get::<EditorHidden>(child).is_none()
+        && world.get::<jackdaw_ui::UiGeneratedPart>(child).is_none()
         && world
             .get::<jackdaw_scene_types::DerivedFaceMesh>(child)
             .is_none()
@@ -407,7 +408,7 @@ pub(crate) fn rebuild_hierarchy(world: &mut World) -> Result {
         roots: &mut QueryState<
             Entity,
             (
-                With<Transform>,
+                Or<(With<Transform>, With<jackdaw_ui::UiCanvas>)>,
                 Without<EditorEntity>,
                 Without<EditorHidden>,
                 Without<ChildOf>,
@@ -635,11 +636,15 @@ fn on_root_entity_added(
     mut commands: Commands,
     tree_index: Res<TreeIndex>,
     editor_check: Query<(), Or<(With<EditorEntity>, With<EditorHidden>)>>,
+    generated_ui_check: Query<(), With<jackdaw_ui::UiGeneratedPart>>,
     child_of_check: Query<(), With<ChildOf>>,
 ) {
     let entity = trigger.event_target();
 
-    if editor_check.contains(entity) || child_of_check.contains(entity) {
+    if editor_check.contains(entity)
+        || generated_ui_check.contains(entity)
+        || child_of_check.contains(entity)
+    {
         return;
     }
     if tree_index.contains_anywhere(entity) {
@@ -654,6 +659,9 @@ fn on_root_entity_added(
         if world.get::<EditorEntity>(entity).is_some()
             || world.get::<EditorHidden>(entity).is_some()
         {
+            return;
+        }
+        if world.get::<jackdaw_ui::UiGeneratedPart>(entity).is_some() {
             return;
         }
         // In named-only mode, skip entities without a Name
@@ -684,6 +692,7 @@ fn on_name_changed(
     content_query: Query<&Children, With<TreeRowContent>>,
     mut label_query: Query<&mut Text, With<TreeRowLabel>>,
     editor_check: Query<(), Or<(With<EditorEntity>, With<EditorHidden>)>>,
+    generated_ui_check: Query<(), With<jackdaw_ui::UiGeneratedPart>>,
     child_of_check: Query<(), With<ChildOf>>,
 ) {
     let entity = trigger.event_target();
@@ -722,7 +731,10 @@ fn on_name_changed(
     } else {
         // No row exists anywhere yet. Spawn one per container if this
         // is a visible root.
-        if editor_check.contains(entity) || child_of_check.contains(entity) {
+        if editor_check.contains(entity)
+            || generated_ui_check.contains(entity)
+            || child_of_check.contains(entity)
+        {
             return;
         }
 
@@ -733,6 +745,7 @@ fn on_name_changed(
             }
             if world.get::<EditorEntity>(entity).is_some()
                 || world.get::<EditorHidden>(entity).is_some()
+                || world.get::<jackdaw_ui::UiGeneratedPart>(entity).is_some()
             {
                 return;
             }
@@ -860,6 +873,7 @@ fn on_entity_reparented(
     mut commands: Commands,
     tree_index: Res<TreeIndex>,
     editor_check: Query<(), Or<(With<EditorEntity>, With<EditorHidden>)>>,
+    generated_ui_check: Query<(), With<jackdaw_ui::UiGeneratedPart>>,
     tree_node_check: Query<(), With<TreeNode>>,
     child_of_query: Query<&ChildOf>,
     children_query: Query<&Children>,
@@ -869,7 +883,10 @@ fn on_entity_reparented(
     let entity = trigger.event_target();
 
     // Skip editor/hidden entities and tree row UI entities
-    if editor_check.contains(entity) || tree_node_check.contains(entity) {
+    if editor_check.contains(entity)
+        || generated_ui_check.contains(entity)
+        || tree_node_check.contains(entity)
+    {
         return;
     }
 
