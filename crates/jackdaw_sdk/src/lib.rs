@@ -1,13 +1,11 @@
-//! Proxy dylib shipped with jackdaw.
+//! SDK facade dylib shipped with Jackdaw.
 //!
 //! Extensions are built via `cargo rustc` with:
 //!
 //! ```text
 //! -C prefer-dynamic
 //! --extern bevy=<jackdaw>/target/debug/libjackdaw_sdk.so
-//! --extern bevy=<jackdaw>/target/debug/deps/libjackdaw_sdk.rlib
 //! --extern jackdaw_api=<jackdaw>/target/debug/libjackdaw_sdk.so
-//! --extern jackdaw_api=<jackdaw>/target/debug/deps/libjackdaw_sdk.rlib
 //! -L dependency=<jackdaw>/target/debug/deps
 //! ```
 //!
@@ -15,8 +13,8 @@
 //! `jackdaw_api` during compilation of the extension, so extension
 //! code writes plain `use bevy::prelude::*;` and
 //! `use jackdaw_api::prelude::*;`. Both resolve to this crate's
-//! re-exports, which ultimately point at the one compilation of
-//! bevy and `jackdaw_api` that was built alongside the editor.
+//! re-exports, which ultimately point at the shared `bevy_dylib` and
+//! `jackdaw_dylib` runtimes loaded by the editor.
 //!
 //! Re-exports mirror `jackdaw_api`'s public surface. Editor-host
 //! plumbing (loader plugin, catalog, enable/disable helpers) lives
@@ -43,6 +41,12 @@ pub use jackdaw_api::{
     ExtensionContext, ExtensionKind, ExtensionPoint, HierarchyWindow, InspectorWindow,
     JackdawExtension, MenuEntryDescriptor, PanelContext, WindowDescriptor, op, pie, runtime, scene,
 };
+
+// The generated project shim is compiled with this dylib aliased as
+// `jackdaw_api`, so its internal bridge calls must be visible through the
+// facade too. Keeping the calls here makes the runner Bevy-free on Windows.
+#[doc(hidden)]
+pub use jackdaw_api::{__extract_project_schema_json, __run_project_game};
 
 /// Bevy root surface for extension code walking bevy paths beyond
 /// the prelude. Safe to glob: none of the explicit `jackdaw_api`

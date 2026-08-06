@@ -226,10 +226,22 @@ pub fn run_windowless_game(
     std::thread::spawn(move || {
         let _ = accept_tx.send(handle.accept());
     });
-    let _transport = accept_rx
-        .recv_timeout(Duration::from_secs(90))
-        .expect("the runner never connected to the PIE link")
-        .expect("ipc accept failed");
+    // On timeout the child's stderr is the only evidence of why it never
+    // got as far as connecting. Discarding it left a bare 90 second
+    // timeout with nothing to act on, which is how this failure went
+    // undiagnosed: it gates every release binary through the heavy tier.
+    let accepted = accept_rx.recv_timeout(Duration::from_secs(90));
+    if accepted.is_err() {
+        let captured = stderr_buf.lock().unwrap().clone();
+        let captured = if captured.trim().is_empty() {
+            "(the runner produced no output at all)".to_string()
+        } else {
+            captured
+        };
+        let _ = child.kill();
+        panic!("the runner never connected to the PIE link. Its output was:\n{captured}");
+    }
+    let _transport = accepted.expect("checked above").expect("ipc accept failed");
 
     let deadline = Instant::now() + Duration::from_secs(90);
     let mut loaded = false;
@@ -297,4 +309,64 @@ impl OperatorResultExt for OperatorResult {
             "Operator did not enter modal Running state"
         );
     }
+}
+
+/// Make sure the SDK's manifest and its native link search paths exist
+/// before a pipeline test drives cargo directly.
+///
+/// The driver generates these on demand, but these tests bypass it and
+/// invoke `cargo rustc` with the wrapper themselves. Without the search
+/// paths a consumer cannot find import libraries the SDK's crates link
+/// by bare name, which on Windows is every `windows.*.lib` and fails the
+/// link. Linux never noticed: its native libraries are system wide.
+#[expect(clippy::allow_attributes, reason = "shared across test binaries")]
+#[allow(dead_code, reason = "used by the SDK pipeline tests only")]
+pub fn ensure_sdk_metadata(sdk: &jackdaw::sdk_paths::SdkPaths) {
+    use jackdaw::project_build::plan::SdkManifest;
+
+    let workspace = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // Match the root feature set that linked this test binary. The heavy
+    // journey enables `runner`, which in turn enables Jackdaw runtime features
+    // and changes Rust's crate identities. Rebuilding only `dylib` here would
+    // replace the loaded SDK's unhashed dylibs with an incompatible variant.
+    // Always refresh this test metadata: a restored target cache can contain a
+    // non-empty manifest from the other feature set, and existence alone does
+    // not prove that it describes the dylibs this process loaded.
+    let features = if cfg!(feature = "runner") {
+        "dylib runner"
+    } else {
+        "dylib"
+    };
+    SdkManifest::generate(&workspace, sdk, &["-p", "jackdaw", "--features", features])
+        .expect("generate the SDK manifest for the fixture");
+}
+
+/// Build the zero-registration reflection fixture through the same generated
+/// shim, lock alignment, and extern plan used for editor-driven projects.
+/// Keeping this helper shared makes both the dlopen and linkage probes
+/// self-contained while Cargo reuses the salted project target between them.
+#[expect(clippy::allow_attributes, reason = "shared across test binaries")]
+#[allow(dead_code, reason = "used by the SDK reflection probes only")]
+pub fn build_reflect_fixture(
+    sdk: &jackdaw::sdk_paths::SdkPaths,
+) -> jackdaw::project_build::ProjectBuild {
+    ensure_sdk_metadata(sdk);
+    let workspace = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = stage_fixture("reflect_game");
+    let jackdaw_dir = project_root.join(".jackdaw");
+    let spec = jackdaw::project_build::shim::ShimSpec {
+        package_name: "reflect_game".into(),
+        crate_name: "reflect_game".into(),
+        project_root,
+        game_plugin: Some("GamePlugin".into()),
+        extension_type: None,
+    };
+    jackdaw::project_build::build_project_dylib(
+        &spec,
+        &jackdaw_dir,
+        sdk,
+        Some(&workspace),
+        &mut |_| {},
+    )
+    .unwrap_or_else(|err| panic!("build reflect fixture through project pipeline: {err:?}"))
 }
